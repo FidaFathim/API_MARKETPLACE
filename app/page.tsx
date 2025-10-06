@@ -22,6 +22,45 @@ interface ApiCardProps {
   auth: string;
 }
 
+interface ButtonProps {
+  children: React.ReactNode;
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'filter';
+  isActive?: boolean;
+  className?: string;
+}
+
+const Button = ({ children, onClick, variant = 'primary', isActive = false, className = '' }: ButtonProps) => {
+  const getStyles = () => {
+    if (variant === 'filter') {
+      return {
+        backgroundColor: isActive ? '#00CECB' : '#FFED66',
+        color: isActive ? '#FFFFEA' : '#171717',
+      };
+    }
+    if (variant === 'secondary') {
+      return {
+        backgroundColor: '#FFED66',
+        color: '#171717',
+      };
+    }
+    return {
+      backgroundColor: '#00CECB',
+      color: '#FFFFEA',
+    };
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-lg font-semibold transition-all hover:opacity-90 ${className}`}
+      style={getStyles()}
+    >
+      {children}
+    </button>
+  );
+};
+
 const ApiCard = ({ title, description, tags, featured, category, link, auth }: ApiCardProps) => (
   <div
     className={`rounded-lg shadow-md p-8 mb-6 bg-white border transition hover:shadow-lg`}
@@ -95,6 +134,12 @@ export default function Home() {
   const [apis, setApis] = useState<ApiData[]>([]);
   const [categories, setCategories] = useState<string[]>(['All']);
   
+  const handleSignIn = () => {
+    // In a real Next.js app with router: router.push('/sign-in')
+    // For production use:
+    window.location.href = '/sign-in';
+  };
+  
   useEffect(() => {
     const loadApis = async () => {
       try {
@@ -133,6 +178,12 @@ export default function Home() {
   return (
     <main className="min-h-screen py-12 px-4" style={{ backgroundColor: '#FFFFEA' }}>
       <div className="max-w-6xl mx-auto">
+        <div className="flex justify-end mb-4">
+          <Button onClick={handleSignIn} className="px-6">
+            Sign In
+          </Button>
+        </div>
+
         <header className="mb-12 text-center">
           <h1 className="text-6xl font-bold mb-4" style={{ color: '#FF5E5B' }}>API STORE</h1>
           <p className="text-xl" style={{ color: '#171717' }}>
@@ -156,17 +207,14 @@ export default function Home() {
           
           <div className="flex flex-wrap gap-3 justify-center">
             {categories.map((category) => (
-              <button
+              <Button
                 key={category}
                 onClick={() => setSelectedCategory(category)}
-                className="px-4 py-2 rounded-lg transition-all"
-                style={{
-                  backgroundColor: selectedCategory === category ? '#00CECB' : '#FFED66',
-                  color: selectedCategory === category ? '#FFFFEA' : '#171717',
-                }}
+                variant="filter"
+                isActive={selectedCategory === category}
               >
                 {category}
-              </button>
+              </Button>
             ))}
           </div>
         </div>
