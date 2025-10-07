@@ -363,11 +363,18 @@ function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
         <div className="mb-8 flex flex-col gap-6 items-center">
           <div className="w-full max-w-lg relative">
             <div className="relative">
+              {/* Search Icon */}
+              <img
+                src="/search.png"
+                alt="Search"
+                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none opacity-70"
+                style={{ zIndex: 2 }}
+              />
               <input
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search APIs... (Press Enter to add as filter)"
-                className="w-full px-4 py-3 rounded-lg text-lg bg-gray-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full px-10 py-3 rounded-lg text-lg bg-gray-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-indigo-600"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
