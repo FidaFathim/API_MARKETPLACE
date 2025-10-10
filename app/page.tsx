@@ -168,15 +168,6 @@ const FEATURED_APIS = [
     tags: ["security", "malware", "threat-detection"]
   },
   {
-    API: "OpenAI",
-    Description: "Create AI models and integrate machine learning capabilities into your applications",
-    Category: "AI/ML",
-    Link: "https://platform.openai.com/docs/api-reference",
-    Auth: "apiKey",
-    Cors: "yes",
-    tags: ["ai", "machine-learning", "nlp"]
-  },
-  {
     API: "Bitly",
     Description: "URL shortening and link management platform with detailed analytics",
     Category: "URL Shortener",
@@ -186,13 +177,14 @@ const FEATURED_APIS = [
     tags: ["url", "analytics", "links"]
   },
   {
-    API: "Abstract Geolocation",
-    Description: "Locate and identify website visitors by IP address with detailed geographical data",
-    Category: "Geolocation",
-    Link: "https://www.abstractapi.com/ip-geolocation-api",
-    Auth: "apiKey",
+    API: "QR code",
+    Description: "Create an easy to read QR code and URL shortener",
+    Auth: "",
+    HTTPS: true,
     Cors: "yes",
-    tags: ["ip", "location", "geo"]
+    Link: "https://www.qrtag.net/api/",
+    Category: "Development",
+    tags: ["qr", "generator", "scanning"]
   },
   {
     API: "Shodan",
