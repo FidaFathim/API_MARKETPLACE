@@ -22,3 +22,28 @@ body {
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
+
+/* Hide scrollbar while maintaining scroll functionality */
+.featured-apis-container {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+  scroll-behavior: smooth;
+  padding: 1rem 0;  /* Add padding to show card shadows */
+}
+
+.featured-apis-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Card hover effects */
+.api-card-featured {
+  transform: scale(1.02);
+  transition: transform 0.3s ease;
+  min-width: 380px;  /* Increased card width */
+  min-height: 300px; /* Increased card height */
+}
+
+.api-card-featured:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+}
