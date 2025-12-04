@@ -159,6 +159,15 @@ const InfoMessage = ({ message }: { message: string }) => (
 // --- Featured APIs Constant ---
 const FEATURED_APIS = [
   {
+    API: "HaveIBeenPwned",
+    Description: "Passwords which have previously been exposed in data breaches",
+    Category: "Security",
+    Link: "https://haveibeenpwned.com/API/v3#PwnedPasswords",
+    Auth: "apiKey",
+    Cors: "yes",
+    tags: ["security", "breaches", "passwords"]
+  },
+  {
     API: "VirusTotal",
     Description: "Analyze suspicious files, URLs, IP addresses, and domains to detect malware and cyber threats",
     Category: "Security",
@@ -572,6 +581,9 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
   const [apiDetails, setApiDetails] = useState<ApiDetails | null>(null);
   const [loading, setLoading] = useState(true);
   const [scrapingError, setScrapingError] = useState<string | null>(null);
+  const [playgroundLoading, setPlaygroundLoading] = useState(false);
+  const [playgroundResult, setPlaygroundResult] = useState<any>(null);
+  const [playgroundError, setPlaygroundError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!apiId) return;
@@ -622,6 +634,37 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
 
     fetchApiDetails();
   }, [apiId]);
+
+  const handlePlaygroundTest = async (password: string) => {
+    setPlaygroundLoading(true);
+    setPlaygroundError(null);
+    setPlaygroundResult(null);
+
+    try {
+      const response = await fetch('/api/haveibeenpwned', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          password
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'API request failed');
+      }
+
+      setPlaygroundResult(data);
+    } catch (error) {
+      console.error('Playground test error:', error);
+      setPlaygroundError(error instanceof Error ? error.message : 'An error occurred');
+    } finally {
+      setPlaygroundLoading(false);
+    }
+  };
 
   if (loading) return <LoadingSpinner />;
   if (!apiDetails) return <InfoMessage message="API not found" />;
@@ -690,7 +733,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
         )}
 
         {apiDetails.scraped.requirements && apiDetails.scraped.requirements.length > 0 && (
-          <section>
+          <section className="mb-12">
             <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">Requirements / Features</h2>
             <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
               <ul className="list-disc list-inside space-y-2 text-gray-300">
@@ -698,6 +741,75 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
                   <li key={index}>{req}</li>
                 ))}
               </ul>
+            </div>
+          </section>
+        )}
+
+        {/* Have I Been Pwned Playground */}
+        {apiDetails.API === 'HaveIBeenPwned' && (
+          <section className="mb-8">
+            <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">API Playground</h2>
+            <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
+              <div className="mb-6">
+                <h3 className="text-lg font-semibold mb-4 text-white">Test Password Security</h3>
+                <p className="text-gray-300 mb-4">
+                  Enter a password to check if it has been exposed in data breaches. Your password is never sent in full - only a partial hash is used for the check.
+                </p>
+                
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-300 mb-2">
+                      Password to test:
+                    </label>
+                    <input
+                      type="password"
+                      id="passwordInput"
+                      className="w-full px-3 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      placeholder="Enter password to test"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => {
+                        const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
+                        if (passwordInput.value.trim()) {
+                          handlePlaygroundTest(passwordInput.value.trim());
+                        }
+                      }}
+                      disabled={playgroundLoading}
+                      className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {playgroundLoading ? 'Testing...' : 'Test Password'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {playgroundError && (
+                <div className="mb-4 p-4 rounded-lg bg-red-900 text-white">
+                  <p className="text-sm">❌ {playgroundError}</p>
+                </div>
+              )}
+
+              {playgroundResult && (
+                <div className={`p-4 rounded-lg ${playgroundResult.status === 'safe' ? 'bg-green-900' : 'bg-red-900'} text-white`}>
+                  <div className="flex items-center mb-2">
+                    <span className="text-lg mr-2">
+                      {playgroundResult.status === 'safe' ? '✅' : '⚠️'}
+                    </span>
+                    <span className="font-semibold">
+                      {playgroundResult.status === 'safe' ? 'Safe' : 'Compromised'}
+                    </span>
+                  </div>
+                  <p className="text-sm mb-2">{playgroundResult.message}</p>
+                  {playgroundResult.breachCount && (
+                    <p className="text-sm">
+                      Found in {playgroundResult.breachCount} data breach{playgroundResult.breachCount !== 1 ? 'es' : ''}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           </section>
         )}

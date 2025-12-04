@@ -10554,7 +10554,7 @@
         "Auth": "apiKey",
         "HTTPS": true,
         "Cors": "unknown",
-        "Link": "https://haveibeenpwned.com/API/v3",
+        "Link": "https://haveibeenpwned.com/API/v3#PwnedPasswords",
         "Category": "Security"
     },
     {

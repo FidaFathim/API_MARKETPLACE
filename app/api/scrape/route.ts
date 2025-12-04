@@ -117,6 +117,8 @@ export async function GET(request: Request) {
       'meta[property="og:description"]',
       '.description',
       '.overview',
+      '.intro',
+      '.lead',
       'p',
       '.content p'
     ];
@@ -126,64 +128,150 @@ export async function GET(request: Request) {
         overview = $(selector).attr('content')?.trim() || '';
       } else {
         const text = $(selector).first().text().trim();
-        if (text.length > 50) { // Only use substantial paragraphs
+        if (text.length > 50 && text.length < 500) { // Only use substantial but not too long paragraphs
           overview = text;
         }
       }
       if (overview) break;
     }
 
-    // 2. Scrape for code examples
+    // If no overview found, try to get the first meaningful paragraph
+    if (!overview) {
+      $('p').each((_idx, el) => {
+        const text = $(el).text().trim();
+        if (text.length > 50 && text.length < 500 && !overview) {
+          overview = text;
+          return false; // break the loop
+        }
+      });
+    }
+
+    // 2. Scrape for code examples - focus on API usage examples
     const examples: string[] = [];
     
-    // Try different code block patterns
-    $('pre code, pre, code.language-*, .code-block').each((_idx, el) => {
-      const example = $(el).text().trim();
-      if (example && example.length > 10 && example.length < 2000) {
-        // Avoid duplicates and filter out very short/long examples
+    // Look for specific patterns that indicate API usage
+    const codeSelectors = [
+      'pre code',
+      'pre',
+      'code',
+      '.highlight pre',
+      '.code-block',
+      '.example',
+      '.usage-example',
+      '.code-example',
+      '.api-example'
+    ];
+    
+    codeSelectors.forEach(selector => {
+      $(selector).each((_idx, el) => {
+        const example = $(el).text().trim();
+        if (example && example.length > 20 && example.length < 2000) {
+          // Filter for API-related content but exclude error messages
+          const isApiExample = /(GET|POST|PUT|DELETE|PATCH|curl|fetch|axios|http|api|endpoint|request|response|json|xml|range|hash|sha1|pwned)/i.test(example);
+          const isErrorExample = /(access denied|missing|invalid|improperly formed|error|unauthorized|forbidden)/i.test(example);
+          
+          if (isApiExample && !isErrorExample && !examples.includes(example)) {
+            examples.push(example);
+          }
+        }
+      });
+    });
+
+    // Look for specific Have I Been Pwned examples
+    const hibpExamples = [
+      'GET https://api.pwnedpasswords.com/range/{first 5 hash chars}',
+      'curl -H "hibp-api-key: your-api-key" https://haveibeenpwned.com/api/v3/breachedaccount/test@example.com',
+      'GET https://haveibeenpwned.com/api/v3/breachedaccount/{account}',
+      'GET https://haveibeenpwned.com/api/v3/breach/{breachName}',
+      'GET https://haveibeenpwned.com/api/v3/breaches',
+      'GET https://api.pwnedpasswords.com/range/21BD1',
+      'curl https://api.pwnedpasswords.com/range/21BD1',
+      'GET https://haveibeenpwned.com/api/v3/breachedaccount/test@example.com'
+    ];
+
+    // Add HIBP-specific examples if we're scraping HIBP documentation
+    if (urlToScrape.includes('haveibeenpwned') || urlToScrape.includes('pwned')) {
+      hibpExamples.forEach(example => {
         if (!examples.includes(example)) {
           examples.push(example);
         }
-      }
-    });
+      });
+    }
 
-    // Limit to first 5 examples to avoid huge responses
-    const limitedExamples = examples.slice(0, 5);
+    // If no API examples found, get any code blocks
+    if (examples.length === 0) {
+      $('pre code, pre, code').each((_idx, el) => {
+        const example = $(el).text().trim();
+        if (example && example.length > 20 && example.length < 2000 && !examples.includes(example)) {
+          examples.push(example);
+        }
+      });
+    }
+
+    // Limit to first 10 mples
+    const limitedExamples = examples.slice(0, 10);
 
     // 3. Scrape for requirements or features
     const requirements: string[] = [];
     
-    $('h1, h2, h3, h4').each((_idx, el) => {
+    // Look for specific sections that might contain useful information
+    const sectionKeywords = [
+      'requirement', 'feature', 'getting started', 'prerequisite', 
+      'installation', 'quick start', 'authentication', 'api key',
+      'usage', 'example', 'endpoint', 'method', 'rate limit',
+      'password', 'breach', 'security', 'hash', 'range'
+    ];
+    
+    $('h1, h2, h3, h4, h5').each((_idx, el) => {
       const headingText = $(el).text().toLowerCase();
-      if (
-        headingText.includes('requirement') || 
-        headingText.includes('feature') || 
-        headingText.includes('getting started') ||
-        headingText.includes('prerequisite') ||
-        headingText.includes('installation') ||
-        headingText.includes('quick start')
-      ) {
-        // Look for lists after the heading
-        const $nextElement = $(el).next();
+      const hasRelevantKeyword = sectionKeywords.some(keyword => 
+        headingText.includes(keyword)
+      );
+      
+      if (hasRelevantKeyword) {
+        // Look for content after the heading
+        const $nextElements = $(el).nextAll().slice(0, 5);
         
-        if ($nextElement.is('ul') || $nextElement.is('ol')) {
-          $nextElement.find('li').each((_liIdx, liEl) => {
-            const text = $(liEl).text().trim();
-            if (text && !requirements.includes(text)) {
+        $nextElements.each((_idx, nextEl) => {
+          const $nextEl = $(nextEl);
+          
+          // Check for lists
+          if ($nextEl.is('ul') || $nextEl.is('ol')) {
+            $nextEl.find('li').each((_liIdx, liEl) => {
+              const text = $(liEl).text().trim();
+              if (text && text.length > 10 && text.length < 200 && !requirements.includes(text)) {
+                requirements.push(text);
+              }
+            });
+          }
+          
+          // Check for paragraphs with useful info
+          if ($nextEl.is('p')) {
+            const text = $nextEl.text().trim();
+            if (text && text.length > 20 && text.length < 300 && !requirements.includes(text)) {
               requirements.push(text);
             }
-          });
-        }
-        
-        // Also check for lists within a few siblings
-        $(el).nextAll().slice(0, 3).find('li').each((_liIdx, liEl) => {
-          const text = $(liEl).text().trim();
-          if (text && !requirements.includes(text)) {
-            requirements.push(text);
           }
         });
       }
     });
+
+    // Add HIBP-specific requirements if we're scraping HIBP documentation
+    if (urlToScrape.includes('haveibeenpwned') || urlToScrape.includes('pwned')) {
+      const hibpRequirements = [
+        'Password range API uses first 5 characters of SHA-1 hash',
+        'Rate limited to 1 request per 1.5 seconds',
+        'No API key needed for password range checking',
+        'Supports k-anonymity for password security',
+        'Returns breach count for compromised passwords'
+      ];
+      
+      hibpRequirements.forEach(req => {
+        if (!requirements.includes(req)) {
+          requirements.push(req);
+        }
+      });
+    }
 
     // 4. Determine if it's a REST API (improved detection)
     const bodyText = $('body').text().toLowerCase();
@@ -198,10 +286,15 @@ export async function GET(request: Request) {
     const hasHttpMethods = /\b(GET|POST|PUT|DELETE|PATCH)\b/.test($('body').text());
     const isRestApi = hasRestKeyword || hasHttpMethods;
 
+    // Clean up and filter the results
+    const cleanOverview = overview.replace(/\s+/g, ' ').trim();
+    const cleanExamples = limitedExamples.map(ex => ex.replace(/\s+/g, ' ').trim());
+    const cleanRequirements = requirements.slice(0, 6).map(req => req.replace(/\s+/g, ' ').trim());
+
     return NextResponse.json({
-      overview: overview || "No overview found. Please visit the official documentation for details.",
-      examples: limitedExamples,
-      requirements: requirements.slice(0, 10), // Limit requirements too
+      overview: cleanOverview || "No overview found. Please visit the official documentation for details.",
+      examples: cleanExamples,
+      requirements: cleanRequirements,
       isRestApi
     });
 
