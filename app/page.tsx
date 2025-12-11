@@ -215,9 +215,9 @@ const FEATURED_APIS = [
   },
 ];
 
-// --- Page Components ---
+// --- Landing Page Component ---
 
-function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) {
+function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -227,7 +227,6 @@ function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<ApiEntry[]>([]);
-  const scrollContainer = useRef<HTMLDivElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
 
@@ -330,7 +329,7 @@ function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
       return true;
     }
 
-    return selectedTags.every(tag => {
+    return selectedTags.some(tag => {
       const tagLower = tag.toLowerCase();
       return (
         api.API.toLowerCase().includes(tagLower) ||
@@ -342,40 +341,153 @@ function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
 
   const displayedCategories = showAllCategories ? categories : categories.slice(0, 9);
 
-  if (loading) return <LoadingSpinner />;
+  const featureCards = [
+    {
+      title: "Discover APIs",
+      description: "Browse through hundreds of APIs across multiple categories. Find the perfect API for your project with our comprehensive search and filtering system.",
+      image: "/slide1.png"
+    },
+    {
+      title: "Test & Integrate",
+      description: "Test APIs directly in our playground, view detailed documentation, and integrate seamlessly into your applications with code examples and guides.",
+      image: "slide2.png"
+    },
+    {
+      title: "Secure & Reliable",
+      description: "Access secure APIs with proper authentication, CORS support, and HTTPS encryption. All APIs are verified and regularly updated for reliability.",
+      image: "slide3.png"
+    }
+  ];
 
   return (
-    <main className="min-h-screen py-12 px-4 bg-gray-900">
-      <div className="max-w-6xl mx-auto">
-        <header className="mb-12 text-center relative">
-          <div className="absolute top-0 right-0">
-            <Button onClick={() => router.push('/sign-in')} variant="primary">
-              Sign In
-            </Button>
+    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
+      {/* Header */}
+      <header className="w-full px-6 py-4 border-b border-gray-200">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
+              {}
+            </div>
+            <span className="text-2xl font-bold text-gray-800">API Store</span>
           </div>
-          <h1 className="text-6xl font-bold mb-4 text-white tracking-tight" style={{ fontFamily: 'system-ui, -apple-system, sans-serif' }}>
-            API STORE
-          </h1>
-          <p className="text-xl text-gray-300">
-            Discover, explore, and integrate powerful APIs for your next project.
-          </p>
-        </header>
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => router.push('/sign-in')}
+              className="px-4 py-2 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition-colors"
+            >
+              Log In
+            </button>
+            <button
+              onClick={() => router.push('/sign-in')}
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+            >
+              Create Account
+            </button>
+          </div>
+        </div>
+      </header>
 
+      {/* Hero Section */}
+      <section className="max-w-7xl mx-auto px-6 py-16 md:py-24">
+        <div className="grid md:grid-cols-2 gap-12 items-center">
+          {/* Left Side - Text Content */}
+          <div className="space-y-6">
+            <div className="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-sm font-semibold">
+              API Store - Where APIs Meet Developers
+            </div>
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-800 leading-tight">
+              Develop, test, manage and consume APIs{' '}
+              <span className="text-orange-500">securely and effortlessly.</span>
+            </h1>
+            <p className="text-xl text-gray-600 leading-relaxed">
+              API Store empowers developers with everything they need to build, share, and integrate APIs, from sandbox testing to real-time analytics.
+            </p>
+            <div className="flex items-center gap-6 pt-4">
+              <a
+                href="#apis"
+                className="text-lg font-semibold text-blue-600 hover:text-blue-700 border-b-2 border-blue-600 pb-1 transition-colors"
+              >
+                Explore →
+              </a>
+              <a
+                href="#apis"
+                className="text-lg font-semibold text-orange-500 hover:text-orange-600 border-b-2 border-orange-500 pb-1 transition-colors"
+              >
+                Get Started →
+              </a>
+            </div>
+          </div>
+
+          {/* Right Side - Illustration Placeholder */}
+          <div className="relative">
+            <div className="bg-gradient-to-br from-blue-100 to-orange-100 rounded-2xl p-8 shadow-xl">
+              <div className="aspect-square bg-white rounded-xl flex items-center justify-center border-4 border-blue-600">
+                <div className="text-center">
+                  <div className="text-6xl mb-4">💻</div>
+                  <div className="text-2xl font-bold text-gray-800">&lt;API&gt;</div>
+                  <div className="mt-4 px-6 py-2 bg-orange-500 text-white rounded-lg font-semibold inline-block">
+                    DEPLOY
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Feature Cards Section */}
+      <section className="max-w-7xl mx-auto px-6 py-16 bg-white/50">
+        <div className="text-center mb-12">
+          <div className="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-sm font-semibold mb-4">
+            What Makes Us Reliable
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-800">
+            Reliable APIs That Power Everyone , From Startups to Enterprises
+          </h2>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-8">
+          {featureCards.map((card, index) => (
+            <div
+              key={index}
+              className="bg-white rounded-2xl shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300 border border-gray-100"
+            >
+              <div className="aspect-video bg-gray-100 overflow-hidden">
+                <img
+                  src={card.image}
+                  alt={card.title}
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="p-6">
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">{card.title}</h3>
+                <p className="text-gray-600 leading-relaxed">{card.description}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* APIs Section */}
+      <section id="apis" className="max-w-7xl mx-auto px-6 py-16 bg-white">
+        <div className="text-center mb-12">
+          <h2 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
+            Explore Our API Collection
+          </h2>
+          <p className="text-xl text-gray-600">
+            Discover and integrate powerful APIs for your next project
+          </p>
+        </div>
+
+        {/* Search and Filters */}
         <div className="mb-8 flex flex-col gap-6 items-center">
           <div className="w-full max-w-lg relative">
             <div className="relative">
-              {/* Search Icon */}
-              <img
-                src="/search.png"
-                alt="Search"
-                className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 pointer-events-none opacity-70"
-                style={{ zIndex: 2 }}
-              />
               <input
                 ref={searchInputRef}
                 type="text"
                 placeholder="Search APIs... (Press Enter to add as filter)"
-                className="w-full px-10 py-3 rounded-lg text-lg bg-gray-800 text-white placeholder-gray-500 outline-none focus:ring-2 focus:ring-indigo-600"
+                className="w-full px-4 py-3 rounded-lg text-lg bg-gray-50 text-gray-800 placeholder-gray-500 border border-gray-300 outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 onKeyDown={handleSearchKeyDown}
@@ -385,30 +497,29 @@ function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
               {showSuggestions && (
                 <div
                   ref={suggestionsRef}
-                  className="absolute top-full left-0 right-0 mt-2 rounded-lg shadow-xl overflow-hidden z-50 bg-gray-800"
+                  className="absolute top-full left-0 right-0 mt-2 rounded-lg shadow-xl overflow-hidden z-50 bg-white border border-gray-200"
                   style={{
                     maxHeight: '400px',
                     overflowY: 'auto',
-                    border: '1px solid #374151'
                   }}
                 >
                   {suggestions.map((api) => (
                     <div
                       key={api.API}
-                      className="px-4 py-3 cursor-pointer transition-colors border-b border-gray-700 hover:bg-gray-700"
+                      className="px-4 py-3 cursor-pointer transition-colors border-b border-gray-200 hover:bg-gray-50"
                       onClick={() => handleSuggestionClick(api)}
                     >
-                      <div className="font-semibold text-white">
+                      <div className="font-semibold text-gray-800">
                         {api.API}
                       </div>
-                      <div className="text-sm text-gray-400">
+                      <div className="text-sm text-gray-600">
                         {api.Description.length > 80 
                           ? api.Description.substring(0, 80) + '...' 
                           : api.Description}
                       </div>
                       <div className="text-xs mt-1">
                         <span
-                          className="inline-block px-2 py-0.5 rounded bg-indigo-600 text-white"
+                          className="inline-block px-2 py-0.5 rounded bg-blue-600 text-white"
                         >
                           {api.Category}
                         </span>
@@ -423,7 +534,7 @@ function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
                   {selectedTags.map((tag) => (
                     <span
                       key={tag}
-                      className="px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2 bg-indigo-600 text-white"
+                      className="px-3 py-1 rounded-full text-sm font-medium flex items-center gap-2 bg-blue-600 text-white"
                     >
                       {tag}
                       <button
@@ -441,141 +552,105 @@ function ApiListPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
           <div className="w-full max-w-4xl">
             <div className="flex flex-wrap gap-2 justify-center">
               {displayedCategories.map((category) => (
-                <Button
+                <button
                   key={category}
                   onClick={() => handleTagToggle(category)}
-                  variant="filter"
-                  isActive={selectedTags.includes(category)}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    selectedTags.includes(category)
+                      ? 'bg-blue-600 text-white border-2 border-blue-700'
+                      : 'bg-gray-200 text-gray-700 border-2 border-transparent hover:bg-gray-300'
+                  }`}
                 >
                   {category}
-                </Button>
+                </button>
               ))}
               {categories.length > 9 && (
-                <Button
+                <button
                   onClick={() => setShowAllCategories(!showAllCategories)}
-                  variant="filter"
-                  isActive={false}
+                  className="px-4 py-2 rounded-lg text-sm font-semibold bg-gray-200 text-gray-700 border-2 border-transparent hover:bg-gray-300 transition-all"
                 >
                   {showAllCategories ? 'Show Less' : '...'}
-                </Button>
+                </button>
               )}
             </div>
           </div>
-        </div>
-
-        <section className="mb-14 relative px-4">
-          <h2 className="text-3xl font-semibold mb-8 text-indigo-400">
-            Featured APIs
-          </h2>
-          
-          <div className="relative">
-            <button 
-              className="absolute left-0 top-1/2 z-10 transform -translate-y-1/2 rounded-full p-3 shadow-lg bg-gray-700 text-white hover:bg-gray-600"
-              onClick={() => {
-                const container = scrollContainer.current;
-                if (container) {
-                  container.scrollBy({ left: -400, behavior: 'smooth' });
-                }
-              }}
-            >
-              ←
-            </button>
-            
-            <button 
-              className="absolute right-0 top-1/2 z-10 transform -translate-y-1/2 rounded-full p-3 shadow-lg bg-gray-700 text-white hover:bg-gray-600"
-              onClick={() => {
-                const container = scrollContainer.current;
-                if (container) {
-                  container.scrollBy({ left: 400, behavior: 'smooth' });
-                }
-              }}
-            >
-              →
-            </button>
-
-            <div 
-              ref={scrollContainer}
-              className="flex overflow-x-auto gap-8 pb-6 snap-x snap-mandatory"
-              style={{ scrollbarWidth: 'thin' }}
-            >
-              {FEATURED_APIS.map((api) => (
-                <div
-                  key={api.API}
-                  className="flex-none snap-center"
-                  onClick={() => onApiSelect(slugify(api.API))}
-                >
-                  <div 
-                    className="p-6 rounded-xl shadow-lg h-full border-2 transition-all duration-300 hover:shadow-xl cursor-pointer bg-gray-800 border-indigo-600" 
-                    style={{ 
-                      minWidth: '340px',
-                      minHeight: '280px',
-                    }}>
-                    <h3 className="text-2xl font-bold mb-3 text-white">
-                      {api.API}
-                    </h3>
-                    <p className="text-base mb-4 text-gray-300">
-                      {api.Description}
-                    </p>
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {api.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-3 py-1 rounded-full text-sm font-medium bg-gray-700 text-gray-200"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex justify-between items-center mt-4">
-                      <span
-                        className="px-3 py-1 rounded-lg text-sm font-medium bg-indigo-600 text-white"
-                      >
-                        {api.Category}
-                      </span>
-                      <span
-                        className="px-3 py-1 rounded-lg text-sm bg-gray-700 text-gray-200"
-                      >
-                        {api.Auth}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        <section>
-          <h2 className="text-3xl font-semibold mb-6 text-center text-indigo-400">
-            All APIs {filteredApis.length > 0 && `(${filteredApis.length})`}
-          </h2>
-          {filteredApis.length === 0 ? (
-            <div className="text-center py-12">
-              <p className="text-xl text-gray-300">
-                No APIs found matching your filters. Try different search terms.
+          {!loading && (
+            <div className="w-full text-center mt-4">
+              <p className="text-lg font-semibold text-gray-700">
+                {filteredApis.length} {filteredApis.length === 1 ? 'API' : 'APIs'} found
               </p>
             </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredApis.map((api) => (
-                <ApiCard
-                  key={api.API}
-                  title={api.API}
-                  description={api.Description}
-                  tags={[api.Auth, `CORS: ${api.Cors}`, api.HTTPS ? 'HTTPS' : 'HTTP']}
-                  category={api.Category}
-                  link={api.Link}
-                  auth={api.Auth}
-                  onClick={() => onApiSelect(slugify(api.API))}
-                />
-              ))}
-            </div>
           )}
-        </section>
-      </div>
+        </div>
+
+        {/* API Grid */}
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-600"></div>
+          </div>
+        ) : filteredApis.length === 0 ? (
+          <div className="text-center py-12">
+            <p className="text-xl text-gray-600">
+              No APIs found matching your filters. Try different search terms.
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredApis.map((api) => (
+              <div
+                key={api.API}
+                onClick={() => onApiSelect(slugify(api.API))}
+                className="bg-white rounded-lg shadow-md p-6 h-full flex flex-col transition hover:shadow-xl cursor-pointer border border-gray-200"
+              >
+                <h3 className="text-lg font-semibold mb-2 text-gray-800">
+                  {api.API}
+                </h3>
+                <p className="mb-3 flex-grow text-sm text-gray-600">
+                  {api.Description}
+                </p>
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {[api.Auth, `CORS: ${api.Cors}`, api.HTTPS ? 'HTTPS' : 'HTTP'].filter(tag => tag).map((tag) => (
+                    <span
+                      key={tag}
+                      className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+                <div className="mt-4 flex justify-between items-center">
+                  <span
+                    className="text-xs font-medium px-3 py-1 rounded bg-blue-600 text-white"
+                  >
+                    {api.Category}
+                  </span>
+                  <a
+                    href={api.Link}
+                    onClick={(e) => e.stopPropagation()}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm hover:underline text-blue-600"
+                  >
+                    View Docs
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* Footer */}
+      <footer className="border-t border-gray-200 bg-white/50 py-8">
+        <div className="max-w-7xl mx-auto px-6 text-center text-gray-600">
+          <p>&copy; 2024 API Store. All rights reserved.</p>
+        </div>
+      </footer>
     </main>
   );
 }
+
+// --- Page Components ---
 
 function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: () => void }) {
   const [apiDetails, setApiDetails] = useState<ApiDetails | null>(null);
@@ -837,5 +912,5 @@ export default function Page() {
     return <ApiDetailsPage apiId={apiId} onBackToHome={handleBackToHome} />;
   }
 
-  return <ApiListPage onApiSelect={handleApiSelect} />;
+  return <LandingPage onApiSelect={handleApiSelect} />;
 }
