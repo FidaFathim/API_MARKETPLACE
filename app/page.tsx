@@ -425,9 +425,12 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
                 <div className="text-center">
                   <div className="text-6xl mb-4">💻</div>
                   <div className="text-2xl font-bold text-gray-800">&lt;API&gt;</div>
-                  <div className="mt-4 px-6 py-2 bg-orange-500 text-white rounded-lg font-semibold inline-block">
-                    DEPLOY
-                  </div>
+                  <button
+                    onClick={() => router.push('/submit-api')}
+                    className="mt-4 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold inline-block transition-colors"
+                  >
+                    SUBMIT API
+                  </button>
                 </div>
               </div>
             </div>
