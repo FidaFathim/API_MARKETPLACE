@@ -24,7 +24,6 @@ interface TestResult {
   statusText: string;
   data: any;
   error?: string;
-  time: number;
 }
 
 interface LoadingState {
@@ -77,7 +76,7 @@ const SubmitApiPage: React.FC = () => {
   };
 
   const handleHeaderChange = (index: number, key: string, value: string) => {
-    const headers = { ...apiForm.headers } || {};
+    const headers = { ...(apiForm.headers || {}) };
     if (key === '' && value === '') {
       delete headers[Object.keys(headers)[index]];
     } else if (index < Object.keys(headers).length) {
@@ -123,44 +122,63 @@ const SubmitApiPage: React.FC = () => {
     setTestResult(null);
 
     try {
-      const startTime = performance.now();
+      // Build headers
+      const headers: Record<string, string> = {
+        ...(apiForm.headers || {}),
+      };
       
-      const requestOptions: RequestInit = {
-        method: apiForm.method,
+      // Only add Content-Type for non-GET requests with body
+      if (apiForm.method !== 'GET' && apiForm.body) {
+        headers['Content-Type'] = 'application/json';
+      }
+
+      // Parse body if it's a string (JSON)
+      let parsedBody: any = null;
+      if (apiForm.method !== 'GET' && apiForm.body) {
+        try {
+          parsedBody = JSON.parse(apiForm.body);
+        } catch {
+          parsedBody = apiForm.body;
+        }
+      }
+
+      // Use proxy API route to bypass CORS (server-side request)
+      const proxyResponse = await fetch('/api/test-proxy', {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(apiForm.headers || {}),
         },
-      };
-
-      if (apiForm.method !== 'GET' && apiForm.body) {
-        requestOptions.body = apiForm.body;
-      }
-
-      const response = await fetch(apiForm.endpoint, requestOptions);
-      const endTime = performance.now();
-      const responseData = await response.json().catch(() => ({}));
-
-      setTestResult({
-        status: response.status,
-        statusText: response.statusText,
-        data: responseData,
-        time: Math.round(endTime - startTime),
+        body: JSON.stringify({
+          url: apiForm.endpoint,
+          method: apiForm.method,
+          headers: headers,
+          body: parsedBody,
+        }),
       });
 
-      if (response.ok) {
+      const proxyData = await proxyResponse.json();
+
+      if (!proxyResponse.ok) {
+        setErrorMessage(proxyData.error || 'Proxy request failed');
+        setTestResult(null);
+        return;
+      }
+
+      setTestResult({
+        status: proxyData.status,
+        statusText: proxyData.statusText,
+        data: proxyData.data,
+      });
+
+      if (proxyData.ok) {
         setErrorMessage('');
+      } else {
+        setErrorMessage(`Request failed with status ${proxyData.status}: ${proxyData.statusText}`);
       }
     } catch (error) {
-      const endTime = performance.now();
-      setTestResult({
-        status: 0,
-        statusText: 'Error',
-        data: null,
-        error: error instanceof Error ? error.message : 'Unknown error occurred',
-        time: Math.round(endTime - performance.now()),
-      });
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to test API');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setErrorMessage(`Error: ${errorMessage}`);
+      setTestResult(null);
     } finally {
       setLoading(prev => ({ ...prev, testing: false }));
     }
@@ -173,12 +191,11 @@ const SubmitApiPage: React.FC = () => {
 
     setErrorMessage('');
     try {
-      // obtain a fresh ID token for the current user
-      const token = await auth.currentUser?.getIdToken();
-      if (!token) {
-        setErrorMessage('Authentication token not available. Please sign in again.');
-        return;
-      }
+      // Get user ID from Firebase Auth (client-side)
+      const userId = auth.currentUser?.uid;
+      
+      // Token is optional now - can be used for future server-side verification
+      const token = await auth.currentUser?.getIdToken().catch(() => null);
 
       const payload = {
         name: apiForm.name,
@@ -188,13 +205,14 @@ const SubmitApiPage: React.FC = () => {
         auth: apiForm.auth,
         https: apiForm.https,
         cors: apiForm.cors,
+        userId: userId || null, // Include user ID in payload
       };
 
       const res = await fetch('/api/submit', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
+          ...(token && { Authorization: `Bearer ${token}` }), // Optional token
         },
         body: JSON.stringify(payload),
       });
@@ -205,7 +223,9 @@ const SubmitApiPage: React.FC = () => {
         return;
       }
 
-      setSuccessMessage('API submitted successfully!');
+      setSuccessMessage(
+        data.message || `API "${data.api?.API || apiForm.name}" added successfully to the marketplace! (Total: ${data.totalCount || 'N/A'} APIs)`
+      );
       setTimeout(() => {
         setSuccessMessage('');
         setApiForm({
@@ -218,7 +238,7 @@ const SubmitApiPage: React.FC = () => {
           cors: 'yes',
           method: 'GET',
         });
-      }, 2000);
+      }, 3000);
     } catch (err) {
       console.error('Submit error', err);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to submit API');
@@ -254,12 +274,20 @@ const SubmitApiPage: React.FC = () => {
             <h1 className="text-2xl font-bold text-white">Submit API</h1>
             <p className="text-gray-400 text-sm mt-1">Welcome, {user?.email}</p>
           </div>
-          <button
-            onClick={handleLogout}
-            className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
-          >
-            Logout
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => router.push('/')}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition"
+            >
+              Back to Home
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg transition"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </header>
 
@@ -479,7 +507,7 @@ const SubmitApiPage: React.FC = () => {
                 </div>
                 <button
                   onClick={() => {
-                    const headers = { ...apiForm.headers } || {};
+                    const headers = { ...(apiForm.headers || {}) };
                     headers[`Header${Object.keys(headers).length + 1}`] = '';
                     handleInputChange('headers', headers);
                   }}
@@ -518,7 +546,7 @@ const SubmitApiPage: React.FC = () => {
               <div className="mt-8 bg-gray-700 rounded-lg border border-gray-600 p-6">
                 <h3 className="text-lg font-bold text-white mb-4">Response</h3>
                 
-                <div className="grid grid-cols-3 gap-4 mb-6">
+                <div className="grid grid-cols-2 gap-4 mb-6">
                   <div>
                     <p className="text-gray-400 text-sm">Status Code</p>
                     <p className={`text-2xl font-bold ${testResult.status >= 200 && testResult.status < 300 ? 'text-green-400' : 'text-red-400'}`}>
@@ -529,10 +557,6 @@ const SubmitApiPage: React.FC = () => {
                     <p className="text-gray-400 text-sm">Status Text</p>
                     <p className="text-white font-semibold">{testResult.statusText}</p>
                   </div>
-                  <div>
-                    <p className="text-gray-400 text-sm">Response Time</p>
-                    <p className="text-white font-semibold">{testResult.time}ms</p>
-                  </div>
                 </div>
 
                 {testResult.error && (
@@ -541,12 +565,14 @@ const SubmitApiPage: React.FC = () => {
                   </div>
                 )}
 
-                <div>
-                  <p className="text-gray-400 text-sm mb-2">Response Body</p>
-                  <pre className="bg-gray-900 border border-gray-600 rounded-lg p-4 text-green-400 overflow-x-auto max-h-64">
-                    {JSON.stringify(testResult.data, null, 2)}
-                  </pre>
-                </div>
+                {testResult.data !== null && (
+                  <div>
+                    <p className="text-gray-400 text-sm mb-2">Response Body</p>
+                    <pre className="bg-gray-900 border border-gray-600 rounded-lg p-4 text-green-400 overflow-x-auto max-h-64">
+                      {JSON.stringify(testResult.data, null, 2)}
+                    </pre>
+                  </div>
+                )}
               </div>
             )}
           </div>

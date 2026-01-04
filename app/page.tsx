@@ -2,6 +2,8 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/app/firebase/config';
 
 // --- Interfaces for Type Safety ---
 interface ApiEntry {
@@ -216,9 +218,10 @@ const FEATURED_APIS = [
 ];
 
 // --- Landing Page Component ---
-
 function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) {
   const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [apis, setApis] = useState<ApiEntry[]>([]);
@@ -251,6 +254,15 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
       }
     };
     loadApis();
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+    });
+
+    return () => unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -366,23 +378,54 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
-              {}
+              {/* <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" /> */}
             </div>
             <span className="text-2xl font-bold text-gray-800">API Store</span>
           </div>
           <div className="flex items-center gap-4">
-            <button
-              onClick={() => router.push('/sign-in')}
-              className="px-4 py-2 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition-colors"
-            >
-              Log In
-            </button>
-            <button
-              onClick={() => router.push('/sign-in')}
-              className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Create Account
-            </button>
+            {authLoading ? (
+              <div className="w-8 h-8 rounded-full bg-gray-300 animate-pulse"></div>
+            ) : user ? (
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
+                  {user.email?.charAt(0).toUpperCase() || 'U'}
+                </div>
+                <button
+                  onClick={() => router.push('/submit-api')}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Submit API
+                </button>
+                <button
+                  onClick={async () => {
+                    try {
+                      await auth.signOut();
+                      router.push('/');
+                    } catch (error) {
+                      console.error('Logout error:', error);
+                    }
+                  }}
+                  className="px-4 py-2 rounded-lg border-2 border-red-600 text-red-600 font-semibold hover:bg-red-50 transition-colors"
+                >
+                  Logout
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => router.push('/sign-in')}
+                  className="px-4 py-2 rounded-lg border-2 border-blue-600 text-blue-600 font-semibold hover:bg-blue-50 transition-colors"
+                >
+                  Log In
+                </button>
+                <button
+                  onClick={() => router.push('/sign-in')}
+                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
+                >
+                  Create Account
+                </button>
+              </>
+            )}
           </div>
         </div>
       </header>

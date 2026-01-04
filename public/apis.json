@@ -1,5 +1,5 @@
 {
-    "count": 1498,
+    "count": 1499,
     "entries": [
         {
             "API": "Cat Facts",
@@ -470,7 +470,7 @@
         },
         {
             "API": "Dribbble",
-            "Description": "Discover the world\u2019s top designers & creatives",
+            "Description": "Discover the world’s top designers & creatives",
             "Auth": "OAuth",
             "HTTPS": true,
             "Cors": "unknown",
@@ -811,7 +811,7 @@
             "Category": "Blockchain"
         },
         {
-            "API": "A B\u00edblia Digital",
+            "API": "A Bíblia Digital",
             "Description": "Do not worry about managing the multiple versions of the Bible",
             "Auth": "apiKey",
             "HTTPS": true,
@@ -2225,7 +2225,7 @@
         },
         {
             "API": "FxFeed.io",
-            "Description": "Foreign exchange rates, currency conversion and time series\u00a0data",
+            "Description": "Foreign exchange rates, currency conversion and time series data",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "yes",
@@ -2440,7 +2440,7 @@
             "Category": "Development"
         },
         {
-            "API": "API Gr\u00e1tis",
+            "API": "API Grátis",
             "Description": "Multiples services and public APIs",
             "Auth": "",
             "HTTPS": true,
@@ -2701,7 +2701,7 @@
             "Category": "Development"
         },
         {
-            "API": "Form Creation\u00a0API",
+            "API": "Form Creation API",
             "Description": "Create and manage customizable forms within your applications",
             "Auth": "apiKey",
             "HTTPS": true,
@@ -2711,7 +2711,7 @@
         },
         {
             "API": "Format JSON Online Dummy API",
-            "Description": "\u2013 A free tool to generate dummy JSON data for testing and prototyping.",
+            "Description": "– A free tool to generate dummy JSON data for testing and prototyping.",
             "Auth": "",
             "HTTPS": true,
             "Cors": "yes",
@@ -3133,7 +3133,7 @@
             "Category": "Development"
         },
         {
-            "API": "Markdown to HTML\u00a0API",
+            "API": "Markdown to HTML API",
             "Description": "This API lets you upload and transform a Markdown file to HTML",
             "Auth": "apiKey",
             "HTTPS": true,
@@ -3656,7 +3656,7 @@
         },
         {
             "API": "UserAgent",
-            "Description": "User agent parsing API\u00a0is designed to help you better understand and interact with your users. By identifying browser, device, and OS data from user agent strings, this API empowers you with accurate, real-time insights into your audience.",
+            "Description": "User agent parsing API is designed to help you better understand and interact with your users. By identifying browser, device, and OS data from user agent strings, this API empowers you with accurate, real-time insights into your audience.",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "yes",
@@ -3935,7 +3935,7 @@
         },
         {
             "API": "Convert Speech to Text API",
-            "Description": "This API converts any speech to text\u00a0multiple languages and dialects",
+            "Description": "This API converts any speech to text multiple languages and dialects",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "yes",
@@ -4043,7 +4043,7 @@
         },
         {
             "API": "OCR AI",
-            "Description": "Document validation API using OCR and AI. Automatically extracts data from documents \u00a0and compares it with user-provided data to verify consistency",
+            "Description": "Document validation API using OCR and AI. Automatically extracts data from documents  and compares it with user-provided data to verify consistency",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "no",
@@ -4636,8 +4636,8 @@
             "Category": "Environment"
         },
         {
-            "API": "Gr\u00fcnstromIndex",
-            "Description": "Green Power Index for Germany (Gr\u00fcnstromindex/GSI)",
+            "API": "GrünstromIndex",
+            "Description": "Green Power Index for Germany (Grünstromindex/GSI)",
             "Auth": "",
             "HTTPS": false,
             "Cors": "yes",
@@ -4664,7 +4664,7 @@
         },
         {
             "API": "National Grid ESO",
-            "Description": "Open data from Great Britain\u2019s Electricity System Operator",
+            "Description": "Open data from Great Britain’s Electricity System Operator",
             "Auth": "",
             "HTTPS": true,
             "Cors": "unknown",
@@ -4979,7 +4979,7 @@
         },
         {
             "API": "IIN API",
-            "Description": "IIN API\u00a0allows you to accurately identify the issuing bank, card type, country of origin, and other details from a credit or debit card number. This is essential for fraud prevention, payment processing, and customer verification.",
+            "Description": "IIN API allows you to accurately identify the issuing bank, card type, country of origin, and other details from a credit or debit card number. This is essential for fraud prevention, payment processing, and customer verification.",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "yes",
@@ -5033,7 +5033,7 @@
         },
         {
             "API": "Mono",
-            "Description": "Connect with users\u2019 bank accounts and access transaction data in Africa",
+            "Description": "Connect with users’ bank accounts and access transaction data in Africa",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "unknown",
@@ -6004,8 +6004,8 @@
             "Category": "Games & Comics"
         },
         {
-            "API": "Pok\u00e9api",
-            "Description": "Pok\u00e9mon Information",
+            "API": "Pokéapi",
+            "Description": "Pokémon Information",
             "Auth": "",
             "HTTPS": true,
             "Cors": "unknown",
@@ -6013,7 +6013,7 @@
             "Category": "Games & Comics"
         },
         {
-            "API": "Pok\u00e9API (GraphQL)",
+            "API": "PokéAPI (GraphQL)",
             "Description": "The Unofficial GraphQL for PokeAPI",
             "Auth": "",
             "HTTPS": true,
@@ -6022,8 +6022,8 @@
             "Category": "Games & Comics"
         },
         {
-            "API": "Pok\u00e9mon TCG",
-            "Description": "Pok\u00e9mon TCG Information",
+            "API": "Pokémon TCG",
+            "Description": "Pokémon TCG Information",
             "Auth": "",
             "HTTPS": true,
             "Cors": "unknown",
@@ -6149,7 +6149,7 @@
         },
         {
             "API": "TCGdex",
-            "Description": "Multi languages Pok\u00e9mon TCG Information",
+            "Description": "Multi languages Pokémon TCG Information",
             "Auth": "",
             "HTTPS": true,
             "Cors": "yes",
@@ -6994,7 +6994,7 @@
             "Category": "Geocoding"
         },
         {
-            "API": "Timezones Dictionary\u00a0API",
+            "API": "Timezones Dictionary API",
             "Description": "This API returns a list of all available timezones for your application",
             "Auth": "apiKey",
             "HTTPS": true,
@@ -7183,8 +7183,8 @@
             "Category": "Government"
         },
         {
-            "API": "City, Gda\u0144sk",
-            "Description": "Gda\u0144sk (PL) City Open Data",
+            "API": "City, Gdańsk",
+            "Description": "Gdańsk (PL) City Open Data",
             "Auth": "",
             "HTTPS": true,
             "Cors": "unknown",
@@ -7372,8 +7372,8 @@
             "Category": "Government"
         },
         {
-            "API": "Istanbul (\u0130BB) Open Data",
-            "Description": "Data sets from the \u0130stanbul Metropolitan Municipality (\u0130BB)",
+            "API": "Istanbul (İBB) Open Data",
+            "Description": "Data sets from the İstanbul Metropolitan Municipality (İBB)",
             "Auth": "",
             "HTTPS": true,
             "Cors": "unknown",
@@ -8912,7 +8912,7 @@
         },
         {
             "API": "NewsX",
-            "Description": "Get or Search Latest Breaking News with ML Powered Summaries \ud83e\udd16",
+            "Description": "Get or Search Latest Breaking News with ML Powered Summaries 🤖",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "unknown",
@@ -8930,7 +8930,7 @@
         },
         {
             "API": "Spaceflight News",
-            "Description": "Spaceflight related news \ud83d\ude80",
+            "Description": "Spaceflight related news 🚀",
             "Auth": "",
             "HTTPS": true,
             "Cors": "yes",
@@ -9244,8 +9244,8 @@
             "Category": "Open Data"
         },
         {
-            "API": "Ume\u00e5 Open Data",
-            "Description": "Open data of the city Ume\u00e5 in northern Sweden",
+            "API": "Umeå Open Data",
+            "Description": "Open data of the city Umeå in northern Sweden",
             "Auth": "",
             "HTTPS": true,
             "Cors": "yes",
@@ -9524,7 +9524,7 @@
         },
         {
             "API": "kimiquotes",
-            "Description": "Team radio and interview quotes by Finnish F1 legend Kimi R\u00e4ikk\u00f6nen",
+            "Description": "Team radio and interview quotes by Finnish F1 legend Kimi Räikkönen",
             "Auth": "",
             "HTTPS": true,
             "Cors": "yes",
@@ -10460,7 +10460,7 @@
         },
         {
             "API": "HackerOne",
-            "Description": "The industry\u2019s first hacker API that helps increase productivity towards creative bug bounty hunting",
+            "Description": "The industry’s first hacker API that helps increase productivity towards creative bug bounty hunting",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "unknown",
@@ -10676,7 +10676,7 @@
         },
         {
             "API": "E-Commerce APIs",
-            "Description": "All around e-commerce\u00a0APIs. Generate QR codes, product categories and thumbnails, barcodes and many more.",
+            "Description": "All around e-commerce APIs. Generate QR codes, product categories and thumbnails, barcodes and many more.",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "yes",
@@ -11279,7 +11279,7 @@
         },
         {
             "API": "Football",
-            "Description": "A simple Open Source Football API to get squads\u2019 stats, best scorers and more",
+            "Description": "A simple Open Source Football API to get squads’ stats, best scorers and more",
             "Auth": "X-Mashape-Key",
             "HTTPS": true,
             "Cors": "unknown",
@@ -11728,7 +11728,7 @@
             "Category": "Test Data"
         },
         {
-            "API": "AI Translate text\u00a0API",
+            "API": "AI Translate text API",
             "Description": "The Text Translation API translates text into any of the 80 supported languages, providing accurate and context-aware translations",
             "Auth": "apiKey",
             "HTTPS": true,
@@ -11809,7 +11809,7 @@
             "Category": "Text Analysis"
         },
         {
-            "API": "Fuzzy Text Search\u00a0API",
+            "API": "Fuzzy Text Search API",
             "Description": "The Fuzzy Text Search API finds close matches for user queries, handling typos and partial inputs to deliver relevant results quickly and accurately",
             "Auth": "apiKey",
             "HTTPS": true,
@@ -11854,7 +11854,7 @@
             "Category": "Text Analysis"
         },
         {
-            "API": "Proofread and Grammar Check\u00a0API",
+            "API": "Proofread and Grammar Check API",
             "Description": "The Proofreading and Grammar Check API ensures the provided text is grammatically correct and polished by automatically proofreading and checking for errors",
             "Auth": "apiKey",
             "HTTPS": true,
@@ -12314,7 +12314,7 @@
         },
         {
             "API": "Transport for Bordeaux, France",
-            "Description": "Bordeaux M\u00e9tropole public transport and more (France)",
+            "Description": "Bordeaux Métropole public transport and more (France)",
             "Auth": "apiKey",
             "HTTPS": true,
             "Cors": "unknown",
@@ -12701,7 +12701,7 @@
         },
         {
             "API": "Brazilian Vehicles and Prices",
-            "Description": "Vehicles information from Funda\u00e7\u00e3o Instituto de Pesquisas Econ\u00f4micas - Fipe",
+            "Description": "Vehicles information from Fundação Instituto de Pesquisas Econômicas - Fipe",
             "Auth": "",
             "HTTPS": true,
             "Cors": "no",
@@ -13481,6 +13481,15 @@
             "Cors": "no",
             "Link": "https://yandex.com/dev/weather/",
             "Category": "Weather"
+        },
+        {
+            "API": "Quotes API",
+            "Description": "A free REST API for fetching random quotes. Perfect for adding inspiration to your apps, websites, or projects.",
+            "Auth": "none",
+            "HTTPS": true,
+            "Cors": "yes",
+            "Link": "https://quotejar.vercel.app/",
+            "Category": "General"
         }
     ]
 }
