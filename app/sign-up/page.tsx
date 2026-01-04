@@ -8,16 +8,36 @@ import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
 const SignUp = () => {
   const [email, setEmail] = useState<string>('');
   const [password, setPassword] = useState<string>('');
+  const [githubUrl, setGithubUrl] = useState<string>('');
+  const [linkedinUrl, setLinkedinUrl] = useState<string>('');
   const [createUserWithEmailAndPassword] = useCreateUserWithEmailAndPassword(auth);
   const router = useRouter();
 
   const handleSignUp = async (): Promise<void> => {
     try {
+      // Validate URLs
+      if (!githubUrl || !linkedinUrl) {
+        alert('Please enter both GitHub and LinkedIn profile URLs');
+        return;
+      }
+      
       const res = await createUserWithEmailAndPassword(email, password);
       console.log({ res });
+      
+      // Store user profile data
+      const userProfile = {
+        email,
+        githubUrl,
+        linkedinUrl,
+        uid: res?.user?.uid,
+      };
       sessionStorage.setItem('user', 'true');
+      sessionStorage.setItem('userProfile', JSON.stringify(userProfile));
+      
       setEmail('');
       setPassword('');
+      setGithubUrl('');
+      setLinkedinUrl('');
       router.push('/');
     } catch (e) {
       console.error(e);
@@ -39,7 +59,7 @@ const SignUp = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-900">
       <div className="bg-gray-800 p-10 rounded-lg shadow-xl w-96">
-        <h1 className="text-white text-2xl mb-5">Sign Up</h1>
+        <h1 className="text-white text-2xl mb-5">Create an Account</h1>
         <input 
           type="email" 
           placeholder="Email" 
@@ -54,11 +74,25 @@ const SignUp = () => {
           onChange={(e) => setPassword(e.target.value)} 
           className="w-full p-3 mb-4 bg-gray-700 rounded outline-none text-white placeholder-gray-500"
         />
+        <input 
+          type="url" 
+          placeholder="GitHub Profile URL" 
+          value={githubUrl} 
+          onChange={(e) => setGithubUrl(e.target.value)} 
+          className="w-full p-3 mb-4 bg-gray-700 rounded outline-none text-white placeholder-gray-500"
+        />
+        <input 
+          type="url" 
+          placeholder="LinkedIn Profile URL" 
+          value={linkedinUrl} 
+          onChange={(e) => setLinkedinUrl(e.target.value)} 
+          className="w-full p-3 mb-4 bg-gray-700 rounded outline-none text-white placeholder-gray-500"
+        />
         <button 
           onClick={handleSignUp}
           className="w-full p-3 bg-indigo-600 rounded text-white hover:bg-indigo-500 mb-3"
         >
-          Sign Up
+          Create Account
         </button>
         <div className="text-center text-white mb-3">or</div>
         <button 
