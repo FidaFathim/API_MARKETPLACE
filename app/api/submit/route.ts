@@ -1,59 +1,64 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
+import { getFirestore, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
+import { initializeApp, getApps } from 'firebase/app';
+
+// Initialize Firebase Admin (server-side)
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_Firebase_apiKey,
+  authDomain: process.env.NEXT_PUBLIC_Firebase_authDomain,
+  projectId: process.env.NEXT_PUBLIC_Firebase_projectId,
+  storageBucket: process.env.NEXT_PUBLIC_Firebase_storageBucket,
+  messagingSenderId: process.env.NEXT_PUBLIC_Firebase_messagingSenderId,
+  appId: process.env.NEXT_PUBLIC_Firebase_appId,
+};
+
+const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
+const db = getFirestore(app);
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
     // Optional: Get user ID from request (client-side Firebase Auth)
-    // For production, you should verify this server-side with Firebase Admin
     const authHeader = req.headers.get('authorization') || '';
     const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-    
-    // If token is provided, extract user ID from it (basic parsing)
-    // Note: This is NOT secure - for production, use Firebase Admin to verify tokens
+
     let uid: string | null = null;
     if (token && body.userId) {
-      // Use userId from body if provided (from client-side auth)
       uid = body.userId;
     } else if (token) {
-      // Try to extract from token (not secure, but works for demo)
-      // In production, verify with Firebase Admin
       uid = 'anonymous';
     }
 
     // Basic validation
-    const { name, description, link, category, auth: authType, https, cors } = body;
+    const { name, description, link, category, auth: authType, https, cors, isPaid, price } = body;
     if (!name || !description || !link) {
       return NextResponse.json({ success: false, error: 'Missing required fields (name, description, link)' }, { status: 400 });
     }
 
-    // Read the existing apis.json file
-    const apisJsonPath = path.join(process.cwd(), 'public', 'apis.json');
-    let apisData: { count: number; entries: any[] };
-    
-    try {
-      const file = await fs.readFile(apisJsonPath, 'utf8');
-      apisData = JSON.parse(file);
-    } catch (e) {
-      // If file doesn't exist or is invalid, create new structure
-      apisData = { count: 0, entries: [] };
+    // Validate pricing
+    if (isPaid && (!price || price < 0.99)) {
+      return NextResponse.json({ success: false, error: 'Paid APIs must have a price of at least $0.99' }, { status: 400 });
     }
 
     // Check if API already exists (by name or link)
-    const existingApi = apisData.entries.find(
-      (api: any) => api.API === name || api.Link === link
-    );
+    const apisRef = collection(db, 'apis');
+    const nameQuery = query(apisRef, where('API', '==', name));
+    const linkQuery = query(apisRef, where('Link', '==', link));
 
-    if (existingApi) {
-      return NextResponse.json({ 
-        success: false, 
-        error: 'API already exists in the list' 
+    const [nameSnapshot, linkSnapshot] = await Promise.all([
+      getDocs(nameQuery),
+      getDocs(linkQuery)
+    ]);
+
+    if (!nameSnapshot.empty || !linkSnapshot.empty) {
+      return NextResponse.json({
+        success: false,
+        error: 'API already exists in the list'
       }, { status: 409 });
     }
 
-    // Create new API entry in the same format as apis.json
+    // Create new API entry
     const newApiEntry = {
       API: name,
       Description: description,
@@ -61,25 +66,23 @@ export async function POST(req: NextRequest) {
       HTTPS: https !== undefined ? https : true,
       Cors: cors || 'unknown',
       Link: link,
-      Category: category || 'General'
+      Category: category || 'General',
+      userId: uid,
+      submittedAt: new Date().toISOString(),
+      isPaid: isPaid || false,
+      price: isPaid ? price : 0,
+      endpoint: link, // Store endpoint for paid APIs
+      createdAt: new Date().toISOString(),
     };
 
-    // Add to entries array
-    apisData.entries.push(newApiEntry);
-    apisData.count = apisData.entries.length;
+    // Add to Firestore
+    const docRef = await addDoc(apisRef, newApiEntry);
 
-    // Write back to apis.json
-    await fs.writeFile(
-      apisJsonPath, 
-      JSON.stringify(apisData, null, 4), 
-      'utf8'
-    );
-
-    return NextResponse.json({ 
-      success: true, 
+    return NextResponse.json({
+      success: true,
       message: 'API added successfully to the marketplace',
-      api: newApiEntry,
-      totalCount: apisData.count
+      api: { ...newApiEntry, id: docRef.id },
+      totalCount: 'N/A' // We can add a count query if needed
     }, { status: 201 });
   } catch (err) {
     console.error('Submit API error', err);

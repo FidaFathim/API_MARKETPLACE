@@ -4,9 +4,11 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/app/firebase/config';
+import { getFirestore, collection, getDocs, query, orderBy, limit, doc, updateDoc, arrayUnion, increment, addDoc, getDoc, where } from 'firebase/firestore';
 
 // --- Interfaces for Type Safety ---
 interface ApiEntry {
+  id?: string;
   API: string;
   Description: string;
   Link: string;
@@ -14,6 +16,11 @@ interface ApiEntry {
   Auth: string;
   Cors: string;
   HTTPS: boolean;
+  userId?: string;
+  submittedAt?: string;
+  isPaid: boolean;
+  price: number;
+  endpoint?: string;
 }
 
 interface ScrapedData {
@@ -25,7 +32,7 @@ interface ScrapedData {
 }
 
 interface ApiDetails extends ApiEntry {
-  scraped: ScrapedData;
+  scraped?: ScrapedData;
 }
 
 interface ApiCardProps {
@@ -92,7 +99,7 @@ const Button = ({ children, onClick, variant = 'primary', isActive = false, clas
   );
 };
 
-const ApiCard = ({ title, description, tags, featured, category, link, auth, onClick }: ApiCardProps) => (
+const ApiCard = ({ title, description, tags, featured, category, link, auth, onClick, isOwner }: ApiCardProps & { isOwner?: boolean }) => (
   <div
     onClick={onClick}
     className={`rounded-lg shadow-lg p-6 h-full flex flex-col transition hover:shadow-xl cursor-pointer`}
@@ -102,9 +109,16 @@ const ApiCard = ({ title, description, tags, featured, category, link, auth, onC
       transform: featured ? 'scale(1.02)' : 'scale(1)',
     }}
   >
-    <h3 className={`${featured ? 'text-xl' : 'text-lg'} font-semibold mb-2 text-white`}>
-      {title}
-    </h3>
+    <div className="flex items-start justify-between mb-2">
+      <h3 className={`${featured ? 'text-xl' : 'text-lg'} font-semibold text-white`}>
+        {title}
+      </h3>
+      {isOwner && (
+        <span className="px-2 py-1 bg-green-600 text-white text-xs rounded font-medium">
+          Owner
+        </span>
+      )}
+    </div>
     <p className={`mb-3 flex-grow ${featured ? 'text-base' : 'text-sm'} text-gray-300`}>
       {description}
     </p>
@@ -215,10 +229,19 @@ const FEATURED_APIS = [
     Cors: "yes",
     tags: ["email", "validation", "verification"]
   },
+  {
+    API: "New API",
+    Description: "New API description",
+    Category: "New Category",
+    Link: "https://new-api.com",
+    Auth: "apiKey",
+    Cors: "yes",
+    tags: ["new", "api", "category"]
+  }
 ];
 
 // --- Landing Page Component ---
-function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) {
+function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: string) => void }) {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [authLoading, setAuthLoading] = useState(true);
@@ -230,22 +253,27 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
   const [showAllCategories, setShowAllCategories] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [suggestions, setSuggestions] = useState<ApiEntry[]>([]);
+  const [wishlist, setWishlist] = useState<string[]>([]);
+  const [cart, setCart] = useState<string[]>([]);
+  const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [purchasedAPIs, setPurchasedAPIs] = useState<string[]>([]);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const suggestionsRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const loadApis = async () => {
       try {
-        const response = await fetch('/apis.json');
-        if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        const data = await response.json();
-        if (data && data.entries) {
-          setApis(data.entries);
-          const uniqueCategories = [...new Set(data.entries.map((api: ApiEntry) => api.Category))] as string[];
-          setCategories(uniqueCategories);
-        }
+        const { getFirestore, collection, getDocs } = await import('firebase/firestore');
+        const { app } = await import('@/app/firebase/config');
+        const db = getFirestore(app);
+
+        const apisSnapshot = await getDocs(collection(db, 'apis'));
+        const apisData = apisSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ApiEntry[];
+
+        setApis(apisData);
+        const uniqueCategories = [...new Set(apisData.map((api: ApiEntry) => api.Category))] as string[];
+        setCategories(uniqueCategories);
       } catch (error) {
         console.error('Error loading APIs:', error);
         setApis([]);
@@ -257,8 +285,26 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
   }, []);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+
+      if (currentUser) {
+        // Fetch user's purchased APIs
+        try {
+          const { getFirestore, doc, getDoc } = await import('firebase/firestore');
+          const { app } = await import('@/app/firebase/config');
+          const db = getFirestore(app);
+
+          const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+          if (userDoc.exists()) {
+            const userData = userDoc.data();
+            setPurchasedAPIs(userData.purchasedAPIs || []);
+          }
+        } catch (error) {
+          console.error('Error fetching user data:', error);
+        }
+      }
+
       setAuthLoading(false);
     });
 
@@ -273,6 +319,12 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
         !searchInputRef.current?.contains(event.target as Node)
       ) {
         setShowSuggestions(false);
+      }
+      if (
+        dropdownRef.current &&
+        !dropdownRef.current.contains(event.target as Node)
+      ) {
+        setShowUserDropdown(false);
       }
     };
 
@@ -320,7 +372,7 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
   const handleSuggestionClick = (api: ApiEntry) => {
     setSearchQuery('');
     setShowSuggestions(false);
-    onApiSelect(slugify(api.API));
+    onApiSelect(api.id!, api.API);
   };
 
   const handleSearchKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -334,6 +386,26 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
     } else if (e.key === 'Escape') {
       setShowSuggestions(false);
     }
+  };
+
+  const handleWishlistToggle = (apiId: string) => {
+    setWishlist(prev => {
+      if (prev.includes(apiId)) {
+        return prev.filter(id => id !== apiId);
+      } else {
+        return [...prev, apiId];
+      }
+    });
+  };
+
+  const handleCartToggle = (apiId: string) => {
+    setCart(prev => {
+      if (prev.includes(apiId)) {
+        return prev.filter(id => id !== apiId);
+      } else {
+        return [...prev, apiId];
+      }
+    });
   };
 
   const filteredApis = apis.filter(api => {
@@ -387,28 +459,93 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
               <div className="w-8 h-8 rounded-full bg-gray-300 animate-pulse"></div>
             ) : user ? (
               <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold">
-                  {user.email?.charAt(0).toUpperCase() || 'U'}
+                <div className="relative" ref={dropdownRef}>
+                  <button
+                    onClick={() => setShowUserDropdown(!showUserDropdown)}
+                    className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white text-sm font-semibold hover:bg-blue-700 transition-colors"
+                  >
+                    {user.email?.charAt(0).toUpperCase() || 'U'}
+                  </button>
+
+                  {showUserDropdown && (
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50">
+                      <div className="px-4 py-2 border-b border-gray-200">
+                        <p className="text-sm font-semibold text-gray-800">{user.email}</p>
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          router.push('/wishlist');
+                          setShowUserDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <span className="text-red-500">❤️</span>
+                        <span className="text-gray-700">Wishlist</span>
+                        {wishlist.length > 0 && (
+                          <span className="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full">
+                            {wishlist.length}
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          router.push('/cart');
+                          setShowUserDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <span className="text-blue-500">🛒</span>
+                        <span className="text-gray-700">Cart</span>
+                        {cart.length > 0 && (
+                          <span className="ml-auto bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                            {cart.length}
+                          </span>
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          router.push('/orders');
+                          setShowUserDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <span className="text-green-500">📦</span>
+                        <span className="text-gray-700">My Orders</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          router.push('/profile');
+                          setShowUserDropdown(false);
+                        }}
+                        className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3"
+                      >
+                        <span className="text-purple-500">👤</span>
+                        <span className="text-gray-700">Profile Dashboard</span>
+                      </button>
+
+                      <div className="border-t border-gray-200 mt-2 pt-2">
+                        <button
+                          onClick={async () => {
+                            try {
+                              await auth.signOut();
+                              router.push('/');
+                            } catch (error) {
+                              console.error('Logout error:', error);
+                            }
+                          }}
+                          className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-red-600"
+                        >
+                          <span>🚪</span>
+                          <span>Logout</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <button
-                  onClick={() => router.push('/submit-api')}
-                  className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-colors"
-                >
-                  Submit API
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      await auth.signOut();
-                      router.push('/');
-                    } catch (error) {
-                      console.error('Logout error:', error);
-                    }
-                  }}
-                  className="px-4 py-2 rounded-lg border-2 border-red-600 text-red-600 font-semibold hover:bg-red-50 transition-colors"
-                >
-                  Logout
-                </button>
               </div>
             ) : (
               <>
@@ -539,7 +676,7 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
                 onKeyDown={handleSearchKeyDown}
                 onFocus={() => searchQuery.trim() && suggestions.length > 0 && setShowSuggestions(true)}
               />
-              
+
               {showSuggestions && (
                 <div
                   ref={suggestionsRef}
@@ -559,8 +696,8 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
                         {api.API}
                       </div>
                       <div className="text-sm text-gray-600">
-                        {api.Description.length > 80 
-                          ? api.Description.substring(0, 80) + '...' 
+                        {api.Description.length > 80
+                          ? api.Description.substring(0, 80) + '...'
                           : api.Description}
                       </div>
                       <div className="text-xs mt-1">
@@ -601,11 +738,10 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
                 <button
                   key={category}
                   onClick={() => handleTagToggle(category)}
-                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-                    selectedTags.includes(category)
-                      ? 'bg-blue-600 text-white border-2 border-blue-700'
-                      : 'bg-gray-200 text-gray-700 border-2 border-transparent hover:bg-gray-300'
-                  }`}
+                  className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${selectedTags.includes(category)
+                    ? 'bg-blue-600 text-white border-2 border-blue-700'
+                    : 'bg-gray-200 text-gray-700 border-2 border-transparent hover:bg-gray-300'
+                    }`}
                 >
                   {category}
                 </button>
@@ -642,46 +778,160 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredApis.map((api) => (
-              <div
-                key={api.API}
-                onClick={() => onApiSelect(slugify(api.API))}
-                className="bg-white rounded-lg shadow-md p-6 h-full flex flex-col transition hover:shadow-xl cursor-pointer border border-gray-200"
-              >
-                <h3 className="text-lg font-semibold mb-2 text-gray-800">
-                  {api.API}
-                </h3>
-                <p className="mb-3 flex-grow text-sm text-gray-600">
-                  {api.Description}
-                </p>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {[api.Auth, `CORS: ${api.Cors}`, api.HTTPS ? 'HTTPS' : 'HTTP'].filter(tag => tag).map((tag) => (
-                    <span
-                      key={tag}
-                      className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700"
+            {filteredApis.map((api) => {
+              const apiId = slugify(api.API);
+              const isInWishlist = wishlist.includes(apiId);
+              const isInCart = cart.includes(apiId);
+
+              return (
+                <div
+                  key={api.API}
+                  className="bg-white rounded-lg shadow-md p-6 h-full flex flex-col transition hover:shadow-xl border border-gray-200 relative group"
+                >
+                  {/* Wishlist and Cart Buttons */}
+                  <div className="absolute top-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleWishlistToggle(apiId);
+                      }}
+                      className={`p-2 rounded-full transition-colors ${isInWishlist
+                        ? 'bg-red-500 text-white'
+                        : 'bg-gray-200 text-gray-600 hover:bg-red-100 hover:text-red-500'
+                        }`}
+                      title={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
                     >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-                <div className="mt-4 flex justify-between items-center">
-                  <span
-                    className="text-xs font-medium px-3 py-1 rounded bg-blue-600 text-white"
+                      <svg className="w-4 h-4" fill={isInWishlist ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    </button>
+
+                    <div className="relative">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleCartToggle(apiId);
+                        }}
+                        className={`p-2 rounded-full transition-colors ${isInCart
+                          ? 'bg-blue-500 text-white'
+                          : 'bg-gray-200 text-gray-600 hover:bg-blue-100 hover:text-blue-500'
+                          }`}
+                        title={isInCart ? 'Remove from cart' : 'Add to cart'}
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </button>
+
+                      {/* Tooltip */}
+                      {!isInCart && (
+                        <div className="absolute bottom-full right-0 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                          Add to cart
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div
+                    onClick={() => onApiSelect(api.id!, api.API)}
+                    className="flex-1 cursor-pointer"
                   >
-                    {api.Category}
-                  </span>
-                  <a
-                    href={api.Link}
-                    onClick={(e) => e.stopPropagation()}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm hover:underline text-blue-600"
-                  >
-                    View Docs
-                  </a>
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="text-lg font-semibold text-gray-800 pr-8">
+                        {api.API}
+                      </h3>
+                      <div className="flex flex-col gap-1">
+                        {user && api.userId === user.uid && (
+                          <span className="px-2 py-1 bg-green-600 text-white text-xs rounded font-medium">
+                            Owner
+                          </span>
+                        )}
+                        {/* Pricing Badge */}
+                        {!api.isPaid ? (
+                          <span className="px-2 py-1 bg-green-500 text-white text-xs rounded font-medium">
+                            FREE
+                          </span>
+                        ) : (
+                          <span className="px-2 py-1 bg-blue-600 text-white text-xs rounded font-medium">
+                            ₹{(api.price).toFixed(2)}
+                          </span>
+                        )}
+                        {/* Access Granted Badge */}
+                        {api.isPaid && api.id && purchasedAPIs.includes(api.id) && (
+                          <span className="px-2 py-1 bg-green-600 text-white text-xs rounded font-medium flex items-center gap-1">
+                            ✓ Access Granted
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <p className="mb-3 flex-grow text-sm text-gray-600">
+                      {api.Description}
+                    </p>
+
+                    {/* Endpoint Display Logic */}
+                    {(!api.isPaid || (user && api.userId === user.uid) || (api.id && purchasedAPIs.includes(api.id))) && (
+                      <div className="mb-3 p-3 bg-gray-50 rounded border border-gray-200">
+                        <p className="text-xs text-gray-600 mb-1">Endpoint:</p>
+                        <code className="text-xs text-blue-600 break-all">{api.endpoint || api.Link}</code>
+                      </div>
+                    )}
+
+                    {/* Purchase Button for Paid APIs */}
+                    {api.isPaid && user && api.userId !== user.uid && api.id && !purchasedAPIs.includes(api.id) && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(`/checkout?apiId=${api.id}`);
+                        }}
+                        className="w-full mb-3 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                      >
+                        Purchase Access – ₹{(api.price).toFixed(2)}
+                      </button>
+                    )}
+
+                    {/* Sign in prompt for non-authenticated users */}
+                    {api.isPaid && !user && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push('/sign-in');
+                        }}
+                        className="w-full mb-3 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white font-semibold rounded-lg transition"
+                      >
+                        Sign in to Purchase
+                      </button>
+                    )}
+
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {[api.Auth, `CORS: ${api.Cors}`, api.HTTPS ? 'HTTPS' : 'HTTP'].filter(tag => tag).map((tag) => (
+                        <span
+                          key={tag}
+                          className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-700"
+                        >
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-4 flex justify-between items-center">
+                      <span
+                        className="text-xs font-medium px-3 py-1 rounded bg-blue-600 text-white"
+                      >
+                        {api.Category}
+                      </span>
+                      <a
+                        href={api.Link}
+                        onClick={(e) => e.stopPropagation()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm hover:underline text-blue-600"
+                      >
+                        View Docs
+                      </a>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </section>
@@ -689,7 +939,7 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string) => void }) 
       {/* Footer */}
       <footer className="border-t border-gray-200 bg-white/50 py-8">
         <div className="max-w-7xl mx-auto px-6 text-center text-gray-600">
-          <p>&copy; 2024 API Store. All rights reserved.</p>
+          <p>&copy; 2026 API Store. Made with ❤️ by Team 3</p>
         </div>
       </footer>
     </main>
@@ -713,33 +963,69 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
       setLoading(true);
       setScrapingError(null);
       try {
-        const response = await fetch('/apis.json');
-        const data = await response.json();
-        const api = data.entries.find(
-          (entry: ApiEntry) => slugify(entry.API) === apiId
-        );
+        const db = getFirestore();
+        let apiData: ApiEntry | undefined;
+        let id: string | undefined;
 
-        if (api) {
+        // 1. Try Direct ID Lookup
+        try {
+          const apiDoc = await getDoc(doc(db, 'apis', apiId));
+          if (apiDoc.exists()) {
+            apiData = apiDoc.data() as ApiEntry;
+            id = apiDoc.id;
+          }
+        } catch (e) {
+          // Ignore error, might be invalid ID format if it's a name
+        }
+
+        // 2. Fallback: Query by Name (if not found by ID)
+        if (!apiData) {
+          // Try to find by exact name match (API field)
+          const q = query(collection(db, 'apis'), where('API', '==', apiId));
+          const snapshot = await getDocs(q);
+
+          if (!snapshot.empty) {
+            const doc = snapshot.docs[0];
+            apiData = doc.data() as ApiEntry;
+            id = doc.id;
+          } else {
+            // Try case-insensitive matching by fetching all (fallback for small datasets)
+            // In production, use Algolia/Elasticsearch or a normalized 'slug' field
+            const qAll = query(collection(db, 'apis'));
+            const allSnapshot = await getDocs(qAll);
+            const foundDoc = allSnapshot.docs.find(d =>
+              d.data().API.toLowerCase() === apiId.toLowerCase()
+            );
+            if (foundDoc) {
+              apiData = foundDoc.data() as ApiEntry;
+              id = foundDoc.id;
+            }
+          }
+        }
+
+        if (apiData && id) {
+          const api = { ...apiData, id };
+
           try {
             const docResponse = await fetch(`/api/scrape?url=${encodeURIComponent(api.Link)}`);
             const scrapedData: ScrapedData = await docResponse.json();
-            
+
             if (scrapedData.error) {
               setScrapingError(scrapedData.error);
             }
-            
+
             setApiDetails({ ...api, scraped: scrapedData });
           } catch (scrapeError) {
             console.error('Scraping failed:', scrapeError);
             setScrapingError('Unable to fetch additional details');
-            setApiDetails({ 
-              ...api, 
-              scraped: { 
+            setApiDetails({
+              ...api,
+              scraped: {
                 overview: 'Unable to fetch documentation. Please visit the official link.',
                 examples: [],
                 requirements: [],
                 isRestApi: false
-              } 
+              }
             });
           }
         } else {
@@ -813,7 +1099,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
             {apiDetails.HTTPS && (
               <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-600 text-white">HTTPS</span>
             )}
-            {apiDetails.scraped.isRestApi && (
+            {apiDetails.scraped?.isRestApi && (
               <span className="px-3 py-1 rounded-full text-sm font-semibold bg-blue-600 text-white">REST API</span>
             )}
           </div>
@@ -831,7 +1117,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
             <a href={apiDetails.Link} target="_blank" rel="noopener noreferrer" className="text-lg hover:underline font-semibold text-indigo-400">
               View Official Documentation →
             </a>
-            {apiDetails.scraped.overview && (
+            {apiDetails.scraped?.overview && (
               <div className="mt-4 text-gray-300">
                 <h3 className="font-semibold mb-2 text-white">Overview</h3>
                 <p className="leading-relaxed">{apiDetails.scraped.overview}</p>
@@ -840,7 +1126,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
           </div>
         </section>
 
-        {apiDetails.scraped.examples && apiDetails.scraped.examples.length > 0 && (
+        {apiDetails.scraped?.examples && apiDetails.scraped.examples.length > 0 && (
           <section className="mb-8">
             <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">Example Usage</h2>
             <div className="bg-gray-950 rounded-lg p-4 shadow-lg">
@@ -853,7 +1139,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
           </section>
         )}
 
-        {apiDetails.scraped.requirements && apiDetails.scraped.requirements.length > 0 && (
+        {apiDetails.scraped?.requirements && apiDetails.scraped.requirements.length > 0 && (
           <section className="mb-12">
             <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">Requirements / Features</h2>
             <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
@@ -876,7 +1162,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
                 <p className="text-gray-300 mb-4">
                   Enter a password to check if it has been exposed in data breaches. Your password is never sent in full - only a partial hash is used for the check.
                 </p>
-                
+
                 <div className="space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-gray-300 mb-2">
@@ -889,7 +1175,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
                       placeholder="Enter password to test"
                     />
                   </div>
-                  
+
                   <div className="flex gap-4">
                     <button
                       onClick={() => {
@@ -942,10 +1228,18 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
 export default function Page() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const apiId = searchParams.get('api');
+  const apiId = searchParams.get('apiId');
+  const apiName = searchParams.get('api');
 
-  const handleApiSelect = (selectedApiId: string) => {
-    router.push(`/?api=${selectedApiId}`);
+  const handleApiSelect = (selectedApiId: string, name?: string) => {
+    const params = new URLSearchParams(window.location.search);
+    if (name) {
+      params.set('api', slugify(name));
+      params.delete('apiId');
+    } else {
+      params.set('apiId', selectedApiId);
+    }
+    router.push(`/?${params.toString()}`);
     window.scrollTo(0, 0);
   };
 
@@ -954,8 +1248,10 @@ export default function Page() {
     window.scrollTo(0, 0);
   };
 
-  if (apiId) {
-    return <ApiDetailsPage apiId={apiId} onBackToHome={handleBackToHome} />;
+  const lookupKey = apiId || apiName;
+
+  if (lookupKey) {
+    return <ApiDetailsPage apiId={lookupKey} onBackToHome={handleBackToHome} />;
   }
 
   return <LandingPage onApiSelect={handleApiSelect} />;
