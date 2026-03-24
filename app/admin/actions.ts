@@ -6,10 +6,18 @@ import * as admin from 'firebase-admin';
 // Initialize Firebase Admin if not already initialized
 if (!admin.apps.length) {
     try {
-        const serviceAccount = require('../../serviceAccountKey.json');
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
+        if (process.env.FIREBASE_PRIVATE_KEY) {
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                    privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+                })
+            });
+        } else {
+            const serviceAccount = require('../../serviceAccountKey.json');
+            admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+        }
     } catch (e) {
         console.error('Failed to initialize Firebase Admin in server actions:', e);
     }

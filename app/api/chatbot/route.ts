@@ -2,13 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import Groq from 'groq-sdk';
 import * as adminLib from 'firebase-admin';
 
-// Initialize Firebase Admin SDK — same pattern as other routes in this project
+// Initialize Firebase Admin SDK
 if (!adminLib.apps.length) {
   try {
-    const serviceAccount = require('../../../../serviceAccountKey.json');
-    adminLib.initializeApp({
-      credential: adminLib.credential.cert(serviceAccount),
-    });
+    if (process.env.FIREBASE_PRIVATE_KEY) {
+      adminLib.initializeApp({
+        credential: adminLib.credential.cert({
+          projectId: process.env.FIREBASE_PROJECT_ID,
+          clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+          privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+        }),
+      });
+    } else {
+      const serviceAccount = require('../../../../serviceAccountKey.json');
+      adminLib.initializeApp({ credential: adminLib.credential.cert(serviceAccount) });
+    }
   } catch (e) {
     console.error('Firebase Admin init error in /api/chatbot:', e);
   }
