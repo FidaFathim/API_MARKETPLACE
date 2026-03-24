@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/app/firebase/config';
 import { getFirestore, collection, getDocs, query, orderBy, limit, doc, updateDoc, arrayUnion, increment, addDoc, getDoc, where } from 'firebase/firestore';
+import Chatbot from '@/app/components/Chatbot';
 
 // --- Interfaces for Type Safety ---
 interface ApiEntry {
@@ -69,16 +70,16 @@ const Button = ({ children, onClick, variant = 'primary', isActive = false, clas
   const getStyles = () => {
     if (variant === 'filter') {
       return {
-        backgroundColor: isActive ? '#4F46E5' : '#374151',
-        color: '#FFFFFF',
+        backgroundColor: isActive ? '#4F46E5' : '#F3F4FB',
+        color: isActive ? '#FFFFFF' : '#4B5563',
         border: isActive ? '2px solid #6366F1' : '2px solid transparent',
       };
     }
     if (variant === 'secondary') {
       return {
-        backgroundColor: '#374151',
-        color: '#FFFFFF',
-        border: '1px solid #4B5563',
+        backgroundColor: '#FFFFFF',
+        color: '#374151',
+        border: '1px solid #E5E7EB',
       };
     }
     return {
@@ -102,47 +103,38 @@ const Button = ({ children, onClick, variant = 'primary', isActive = false, clas
 const ApiCard = ({ title, description, tags, featured, category, link, auth, onClick, isOwner }: ApiCardProps & { isOwner?: boolean }) => (
   <div
     onClick={onClick}
-    className={`rounded-lg shadow-lg p-6 h-full flex flex-col transition hover:shadow-xl cursor-pointer`}
+    className={`rounded-xl shadow-sm hover:shadow-md transition-all duration-300 p-6 h-full flex flex-col cursor-pointer bg-white border border-slate-300 hover:border-indigo-500`}
     style={{
-      backgroundColor: '#1F2937',
-      border: featured ? '2px solid #4F46E5' : '1px solid #374151',
       transform: featured ? 'scale(1.02)' : 'scale(1)',
+      boxShadow: featured ? '0 10px 25px -5px rgba(79, 70, 229, 0.1), 0 8px 10px -6px rgba(79, 70, 229, 0.1)' : '0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06)'
     }}
   >
     <div className="flex items-start justify-between mb-2">
-      <h3 className={`${featured ? 'text-xl' : 'text-lg'} font-semibold text-white`}>
+      <h3 className={`${featured ? 'text-xl' : 'text-lg'} font-bold text-gray-900`}>
         {title}
       </h3>
       {isOwner && (
-        <span className="px-2 py-1 bg-green-600 text-white text-xs rounded font-medium">
+        <span className="px-2 py-1 bg-green-500 text-white text-[10px] rounded-full font-bold uppercase tracking-wider">
           Owner
         </span>
       )}
     </div>
-    <p className={`mb-3 flex-grow ${featured ? 'text-base' : 'text-sm'} text-gray-300`}>
+    <p className={`mb-3 flex-grow ${featured ? 'text-base' : 'text-sm'} text-gray-600 leading-relaxed`}>
       {description}
     </p>
     <div className="flex flex-wrap gap-2 mt-2">
       {tags.filter(tag => tag).map((tag) => (
         <span
           key={tag}
-          className="px-2 py-1 rounded text-xs font-medium"
-          style={{
-            backgroundColor: '#374151',
-            color: '#D1D5DB'
-          }}
+          className="px-2 py-1 rounded-md text-[11px] font-semibold bg-gray-50 text-gray-500 border border-gray-100"
         >
           {tag}
         </span>
       ))}
     </div>
-    <div className="mt-4 flex justify-between items-center">
+    <div className="mt-5 pt-4 border-t border-gray-50 flex justify-between items-center">
       <span
-        className="text-xs font-medium px-3 py-1 rounded"
-        style={{
-          backgroundColor: '#4F46E5',
-          color: '#FFFFFF'
-        }}
+        className="text-[11px] font-bold px-3 py-1 rounded-full uppercase tracking-tight bg-indigo-50 text-indigo-600"
       >
         {category}
       </span>
@@ -151,8 +143,7 @@ const ApiCard = ({ title, description, tags, featured, category, link, auth, onC
         onClick={(e) => e.stopPropagation()}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-sm hover:underline"
-        style={{ color: '#818CF8' }}
+        className="text-sm font-semibold text-blue-600 hover:text-blue-700 hover:underline"
       >
         View Docs
       </a>
@@ -161,14 +152,14 @@ const ApiCard = ({ title, description, tags, featured, category, link, auth, onC
 );
 
 const LoadingSpinner = () => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-900">
+  <div className="min-h-screen flex items-center justify-center bg-white">
     <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600"></div>
   </div>
 );
 
 const InfoMessage = ({ message }: { message: string }) => (
-  <div className="min-h-screen flex items-center justify-center bg-gray-900">
-    <div className="text-xl text-gray-300">{message}</div>
+  <div className="min-h-screen flex items-center justify-center bg-white">
+    <div className="text-xl text-gray-600 font-medium">{message}</div>
   </div>
 );
 
@@ -264,11 +255,14 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
   useEffect(() => {
     const loadApis = async () => {
       try {
-        const { getFirestore, collection, getDocs } = await import('firebase/firestore');
+        const { getFirestore, collection, getDocs, query } = await import('firebase/firestore');
         const { app } = await import('@/app/firebase/config');
         const db = getFirestore(app);
 
-        const apisSnapshot = await getDocs(collection(db, 'apis'));
+        // Fetch all APIs. We don't filter by 'status == approved' because bulk-imported
+        // APIs from the public API list might not have a 'status' field set.
+        // Pending submissions are safely isolated in the 'pending_apis' collection.
+        const apisSnapshot = await getDocs(query(collection(db, 'apis')));
         const apisData = apisSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as ApiEntry[];
 
         setApis(apisData);
@@ -289,6 +283,21 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
       setUser(currentUser);
 
       if (currentUser) {
+        // Ensure admin-session is set if user is admin
+        try {
+          const idTokenResult = await currentUser.getIdTokenResult();
+          if (idTokenResult.claims.admin) {
+            const token = await currentUser.getIdToken();
+            await fetch('/api/admin-session', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ idToken: token })
+            });
+          }
+        } catch (e) {
+          console.error('Failed to set admin session:', e);
+        }
+
         // Fetch user's purchased APIs
         try {
           const { getFirestore, doc, getDoc } = await import('firebase/firestore');
@@ -444,15 +453,15 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
   ];
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
+    <main className="min-h-screen bg-white">
       {/* Header */}
-      <header className="w-full px-6 py-4 border-b border-gray-200">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center text-white font-bold text-xl">
-              {/* <img src="/logo.png" alt="Logo" className="w-full h-full object-contain" /> */}
+      <header className="w-full px-8 py-4 border-b border-gray-100 sticky top-0 bg-white/80 backdrop-blur-md z-50">
+        <div className="max-w-[1440px] mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3 group cursor-pointer" onClick={() => router.push('/')}>
+            <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center overflow-hidden border border-gray-100 group-hover:border-indigo-500 transition-colors">
+              <img src="/APILogo.png" alt="API Store Logo" className="w-full h-full object-contain" />
             </div>
-            <span className="text-2xl font-bold text-gray-800">API Store</span>
+            <span className="text-2xl font-bold text-gray-900 tracking-tight">API Store</span>
           </div>
           <div className="flex items-center gap-4">
             {authLoading ? (
@@ -531,6 +540,7 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
                         <button
                           onClick={async () => {
                             try {
+                              await fetch('/api/admin-session', { method: 'DELETE' });
                               await auth.signOut();
                               router.push('/');
                             } catch (error) {
@@ -568,7 +578,7 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
       </header>
 
       {/* Hero Section */}
-      <section className="max-w-7xl mx-auto px-6 py-16 md:py-24">
+      <section className="max-w-[1440px] mx-auto px-8 py-10 md:py-16">
         <div className="grid md:grid-cols-2 gap-12 items-center">
           {/* Left Side - Text Content */}
           <div className="space-y-6">
@@ -600,14 +610,16 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
 
           {/* Right Side - Illustration Placeholder */}
           <div className="relative">
-            <div className="bg-gradient-to-br from-blue-100 to-orange-100 rounded-2xl p-8 shadow-xl">
-              <div className="aspect-square bg-white rounded-xl flex items-center justify-center border-4 border-blue-600">
-                <div className="text-center">
-                  <div className="text-6xl mb-4">💻</div>
-                  <div className="text-2xl font-bold text-gray-800">&lt;API&gt;</div>
+            <div className="bg-gradient-to-br from-indigo-50 to-blue-50 rounded-3xl p-6 shadow-2xl shadow-indigo-100 border border-indigo-100">
+              <div className="aspect-[1.5/1] bg-white rounded-2xl flex items-center justify-center border-2 border-blue-500 relative overflow-hidden group">
+                <div className="absolute inset-0 bg-grid-slate-100 [mask-image:linear-gradient(0deg,#fff,rgba(255,255,255,0.6))] -z-10"></div>
+                <div className="text-center transform group-hover:scale-105 transition-transform duration-500">
+                  <div className="text-5xl mb-3 drop-shadow-sm">💻</div>
+                  <div className="text-xl font-black text-gray-900 mb-1 tracking-tight">&lt;API STORE /&gt;</div>
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-4">Ready to contribute?</p>
                   <button
                     onClick={() => router.push('/submit-api')}
-                    className="mt-4 px-6 py-2 bg-orange-500 hover:bg-orange-600 text-white rounded-lg font-semibold inline-block transition-colors"
+                    className="px-8 py-2.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-bold text-xs shadow-lg shadow-orange-200 transition-all hover:-translate-y-0.5"
                   >
                     SUBMIT API
                   </button>
@@ -619,7 +631,7 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
       </section>
 
       {/* Feature Cards Section */}
-      <section className="max-w-7xl mx-auto px-6 py-16 bg-white/50">
+      <section className="max-w-[1440px] mx-auto px-8 py-12 bg-gray-50/50 rounded-3xl mx-4 mb-16">
         <div className="text-center mb-12">
           <div className="inline-block px-3 py-1 rounded-full bg-orange-100 text-orange-600 text-sm font-semibold mb-4">
             What Makes Us Reliable
@@ -652,7 +664,7 @@ function LandingPage({ onApiSelect }: { onApiSelect: (apiId: string, name?: stri
       </section>
 
       {/* APIs Section */}
-      <section id="apis" className="max-w-7xl mx-auto px-6 py-16 bg-white">
+      <section id="apis" className="max-w-[1440px] mx-auto px-8 py-16 bg-white">
         <div className="text-center mb-12">
           <h2 className="text-4xl md:text-5xl font-bold text-gray-800 mb-4">
             Explore Our API Collection
@@ -1077,151 +1089,197 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
   if (!apiDetails) return <InfoMessage message="API not found" />;
 
   return (
-    <main className="min-h-screen py-12 px-4 bg-gray-900">
+    <main className="min-h-screen py-16 px-4 bg-white">
       <div className="max-w-4xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-10">
           <button
             onClick={onBackToHome}
-            className="text-lg hover:underline mb-6 block text-indigo-400"
+            className="text-indigo-600 hover:text-indigo-700 font-semibold mb-8 flex items-center gap-2 group transition-all"
           >
-            ← Back to All APIs
+            <span className="group-hover:-translate-x-1 transition-transform">←</span> Back to All APIs
           </button>
-          <h1 className="text-5xl font-bold mb-4 text-white">
-            {apiDetails.API}
-          </h1>
-          <p className="text-xl mb-4 text-gray-300">
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-6">
+            <h1 className="text-5xl font-extrabold text-gray-900 tracking-tight">
+              {apiDetails.API}
+            </h1>
+            <div className="flex flex-wrap gap-2">
+              <span className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-indigo-100 text-indigo-700">{apiDetails.Category}</span>
+              {apiDetails.isPaid && (
+                <span className="px-4 py-1.5 rounded-full text-xs font-bold uppercase tracking-wider bg-blue-100 text-blue-700">₹{apiDetails.price}</span>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xl text-gray-600 leading-relaxed mb-8 max-w-3xl">
             {apiDetails.Description}
           </p>
-          <div className="flex flex-wrap gap-2">
-            <span className="px-3 py-1 rounded-full text-sm font-semibold bg-indigo-600 text-white">{apiDetails.Category}</span>
-            <span className="px-3 py-1 rounded-full text-sm font-semibold bg-gray-700 text-gray-200">Auth: {apiDetails.Auth || 'None'}</span>
-            <span className="px-3 py-1 rounded-full text-sm font-semibold bg-gray-700 text-gray-200">CORS: {apiDetails.Cors}</span>
+
+          <div className="flex flex-wrap gap-3">
+            <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center gap-2">
+              <span className="text-gray-400 text-xs font-bold uppercase">Auth</span>
+              <span className="text-gray-900 font-semibold text-sm">{apiDetails.Auth || 'None'}</span>
+            </div>
+            <div className="px-4 py-2 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center gap-2">
+              <span className="text-gray-400 text-xs font-bold uppercase">CORS</span>
+              <span className="text-gray-900 font-semibold text-sm">{apiDetails.Cors}</span>
+            </div>
             {apiDetails.HTTPS && (
-              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-green-600 text-white">HTTPS</span>
-            )}
-            {apiDetails.scraped?.isRestApi && (
-              <span className="px-3 py-1 rounded-full text-sm font-semibold bg-blue-600 text-white">REST API</span>
+              <div className="px-4 py-2 rounded-xl bg-green-50 border border-green-100 shadow-sm flex items-center gap-2">
+                <span className="text-green-600 text-xs font-bold uppercase">HTTPS</span>
+                <span className="text-green-700 font-bold text-sm">Secure</span>
+              </div>
             )}
           </div>
         </div>
 
         {scrapingError && (
-          <div className="mb-6 p-4 rounded-lg bg-red-900 text-white">
-            <p className="text-sm">⚠️ {scrapingError}</p>
+          <div className="mb-8 p-4 rounded-xl bg-red-50 border border-red-100 text-red-700 flex items-center gap-3">
+            <span className="text-xl">⚠️</span>
+            <p className="text-sm font-medium">{scrapingError}</p>
           </div>
         )}
 
-        <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">Documentation & Overview</h2>
-          <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
-            <a href={apiDetails.Link} target="_blank" rel="noopener noreferrer" className="text-lg hover:underline font-semibold text-indigo-400">
-              View Official Documentation →
+        {/* Documentation Section */}
+        <section className="mb-10">
+          <h2 className="text-xl font-bold mb-5 text-gray-900 flex items-center gap-2">
+            <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm">📖</span>
+            Documentation & Overview
+          </h2>
+          <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-300">
+            <a 
+              href={apiDetails.Link} 
+              target="_blank" 
+              rel="noopener noreferrer" 
+              className="inline-flex items-center gap-2 text-indigo-600 hover:text-indigo-700 font-bold text-lg mb-6 group transition-all"
+            >
+              Visit Official Documentation 
+              <span className="group-hover:translate-x-1 transition-transform">→</span>
             </a>
+            
             {apiDetails.scraped?.overview && (
-              <div className="mt-4 text-gray-300">
-                <h3 className="font-semibold mb-2 text-white">Overview</h3>
-                <p className="leading-relaxed">{apiDetails.scraped.overview}</p>
+              <div className="mt-2 text-gray-700">
+                <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">About this API</h3>
+                <p className="leading-relaxed text-gray-600">{apiDetails.scraped.overview}</p>
               </div>
             )}
           </div>
         </section>
 
+        {/* Examples Section */}
         {apiDetails.scraped?.examples && apiDetails.scraped.examples.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">Example Usage</h2>
-            <div className="bg-gray-950 rounded-lg p-4 shadow-lg">
+          <section className="mb-10">
+            <h2 className="text-xl font-bold mb-5 text-gray-900 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center text-sm">💻</span>
+              Implementation Examples
+            </h2>
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-300">
               {apiDetails.scraped.examples.map((example, index) => (
-                <pre key={index} className="mb-4 p-4 rounded bg-gray-900 overflow-x-auto text-sm text-gray-300">
-                  <code>{example}</code>
-                </pre>
+                <div key={index} className="relative group mb-4 last:mb-0">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Example {index + 1}</span>
+                    <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded font-bold">REST / BASH</span>
+                  </div>
+                  <pre className="p-5 rounded-xl bg-slate-50 border border-slate-200 overflow-x-auto text-sm text-gray-700 font-mono leading-relaxed">
+                    <code>{example}</code>
+                  </pre>
+                </div>
               ))}
             </div>
           </section>
         )}
 
+        {/* Requirements Section */}
         {apiDetails.scraped?.requirements && apiDetails.scraped.requirements.length > 0 && (
           <section className="mb-12">
-            <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">Requirements / Features</h2>
-            <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
-              <ul className="list-disc list-inside space-y-2 text-gray-300">
+            <h2 className="text-xl font-bold mb-5 text-gray-900 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center text-sm">✨</span>
+              Features & Requirements
+            </h2>
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-300">
+              <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {apiDetails.scraped.requirements.map((req, index) => (
-                  <li key={index}>{req}</li>
+                  <li key={index} className="flex items-start gap-3 text-gray-600">
+                    <span className="text-emerald-500 mt-1">✓</span>
+                    <span className="text-sm font-medium">{req}</span>
+                  </li>
                 ))}
               </ul>
             </div>
           </section>
         )}
 
-        {/* Have I Been Pwned Playground */}
+        {/* Playground Section */}
         {apiDetails.API === 'HaveIBeenPwned' && (
-          <section className="mb-8">
-            <h2 className="text-2xl font-semibold mb-4 pb-2 border-b-2 border-indigo-600 text-indigo-400">API Playground</h2>
-            <div className="bg-gray-800 rounded-lg p-6 shadow-lg">
-              <div className="mb-6">
-                <h3 className="text-lg font-semibold mb-4 text-white">Test Password Security</h3>
-                <p className="text-gray-300 mb-4">
-                  Enter a password to check if it has been exposed in data breaches. Your password is never sent in full - only a partial hash is used for the check.
-                </p>
+          <section className="mb-12">
+            <h2 className="text-xl font-bold mb-5 text-gray-900 flex items-center gap-2">
+              <span className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center text-sm">🛡️</span>
+              Playground
+            </h2>
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-slate-300">
+              <p className="text-gray-600 mb-8 max-w-xl text-sm font-medium">
+                Test password vulnerabilities instantly. We only use partial SHA-1 k-Anonymity for total privacy.
+              </p>
 
-                <div className="space-y-4">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-300 mb-2">
-                      Password to test:
-                    </label>
-                    <input
-                      type="password"
-                      id="passwordInput"
-                      className="w-full px-3 py-2 rounded-lg bg-gray-700 text-white border border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                      placeholder="Enter password to test"
-                    />
-                  </div>
-
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => {
-                        const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
-                        if (passwordInput.value.trim()) {
-                          handlePlaygroundTest(passwordInput.value.trim());
-                        }
-                      }}
-                      disabled={playgroundLoading}
-                      className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {playgroundLoading ? 'Testing...' : 'Test Password'}
-                    </button>
-                  </div>
+              <div className="bg-slate-50 border border-slate-200 rounded-2xl p-6 max-w-lg">
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
+                  Password to check
+                </label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <input
+                    type="password"
+                    id="passwordInput"
+                    className="flex-1 px-4 py-3 rounded-xl bg-white border border-slate-300 text-gray-900 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+                    placeholder="e.g. hunter2"
+                  />
+                  <button
+                    onClick={() => {
+                      const passwordInput = document.getElementById('passwordInput') as HTMLInputElement;
+                      if (passwordInput.value.trim()) {
+                        handlePlaygroundTest(passwordInput.value.trim());
+                      }
+                    }}
+                    disabled={playgroundLoading}
+                    className="px-8 py-3 bg-indigo-600 text-white font-bold rounded-xl hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-indigo-200"
+                  >
+                    {playgroundLoading ? 'Testing...' : 'Check Now'}
+                  </button>
                 </div>
+
+                {playgroundError && (
+                  <div className="mt-4 p-4 rounded-xl bg-red-50 text-red-700 text-sm font-medium border border-red-100">
+                    ❌ {playgroundError}
+                  </div>
+                )}
+
+                {playgroundResult && (
+                  <div className={`mt-6 p-6 rounded-2xl border ${
+                    playgroundResult.status === 'safe' 
+                      ? 'bg-green-50 border-green-100 text-green-800' 
+                      : 'bg-orange-50 border-orange-100 text-orange-800'
+                  }`}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <span className="text-2xl">
+                        {playgroundResult.status === 'safe' ? '✅' : '⚠️'}
+                      </span>
+                      <div className="font-bold text-lg leading-none">
+                        {playgroundResult.status === 'safe' ? 'Safe to use' : 'Compromised'}
+                      </div>
+                    </div>
+                    <p className="text-sm opacity-90 leading-relaxed mb-3">{playgroundResult.message}</p>
+                    {playgroundResult.breachCount && (
+                      <div className="inline-block px-3 py-1 rounded-full bg-orange-200/50 text-orange-900 text-[10px] font-black uppercase">
+                        Found in {playgroundResult.breachCount} data leaks
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-
-              {playgroundError && (
-                <div className="mb-4 p-4 rounded-lg bg-red-900 text-white">
-                  <p className="text-sm">❌ {playgroundError}</p>
-                </div>
-              )}
-
-              {playgroundResult && (
-                <div className={`p-4 rounded-lg ${playgroundResult.status === 'safe' ? 'bg-green-900' : 'bg-red-900'} text-white`}>
-                  <div className="flex items-center mb-2">
-                    <span className="text-lg mr-2">
-                      {playgroundResult.status === 'safe' ? '✅' : '⚠️'}
-                    </span>
-                    <span className="font-semibold">
-                      {playgroundResult.status === 'safe' ? 'Safe' : 'Compromised'}
-                    </span>
-                  </div>
-                  <p className="text-sm mb-2">{playgroundResult.message}</p>
-                  {playgroundResult.breachCount && (
-                    <p className="text-sm">
-                      Found in {playgroundResult.breachCount} data breach{playgroundResult.breachCount !== 1 ? 'es' : ''}
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
           </section>
-        )}
-      </div>
-    </main>
+          )}
+        </div>
+      </main>
   );
 }
 
@@ -1251,8 +1309,18 @@ export default function Page() {
   const lookupKey = apiId || apiName;
 
   if (lookupKey) {
-    return <ApiDetailsPage apiId={lookupKey} onBackToHome={handleBackToHome} />;
+    return (
+      <>
+        <ApiDetailsPage apiId={lookupKey} onBackToHome={handleBackToHome} />
+        <Chatbot />
+      </>
+    );
   }
 
-  return <LandingPage onApiSelect={handleApiSelect} />;
+  return (
+    <>
+      <LandingPage onApiSelect={handleApiSelect} />
+      <Chatbot />
+    </>
+  );
 }

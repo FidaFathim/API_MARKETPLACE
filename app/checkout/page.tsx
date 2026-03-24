@@ -189,12 +189,15 @@ export default function CheckoutPage() {
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
-            <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+            <header className="bg-white border-b border-gray-100 sticky top-0 z-50 backdrop-blur-md bg-white/80">
                 <div className="max-w-4xl mx-auto px-6 py-4 flex justify-between items-center">
-                    <h1 className="text-2xl font-bold text-gray-800">Checkout</h1>
+                    <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
+                        <img src="/APILogo.png" alt="Logo" className="w-8 h-8 object-contain" />
+                        <span className="text-xl font-bold text-gray-900">API Store</span>
+                    </div>
                     <button
                         onClick={() => router.push('/')}
-                        className="text-gray-600 hover:text-gray-800 transition-colors"
+                        className="text-gray-500 hover:text-gray-700 font-medium text-sm transition-colors"
                     >
                         ← Back
                     </button>

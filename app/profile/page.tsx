@@ -21,6 +21,7 @@ interface UserProfile {
   uid: string;
   email: string;
   githubLink?: string;
+  username?: string;
   displayName?: string;
 }
 
@@ -28,10 +29,13 @@ const ProfilePage: React.FC = () => {
   const router = useRouter();
   const [user, setUser] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [submittedApis, setSubmittedApis] = useState<ApiEntry[]>([]);
+  const [submittedApis, setSubmittedApis] = useState<(ApiEntry & { status?: string })[]>([]);
   const [githubLink, setGithubLink] = useState('');
+  const [username, setUsername] = useState('');
   const [editingGithub, setEditingGithub] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingUsername, setSavingUsername] = useState(false);
   const [activeTab, setActiveTab] = useState<'submitted' | 'wishlist' | 'cart' | 'orders'>('submitted');
   const [wishlist, setWishlist] = useState<string[]>([]);
   const [cart, setCart] = useState<string[]>([]);
@@ -65,9 +69,8 @@ const ProfilePage: React.FC = () => {
       const response = await fetch(`/api/user/profile?userId=${userId}`);
       if (response.ok) {
         const data = await response.json();
-        if (data.githubLink) {
-          setGithubLink(data.githubLink);
-        }
+        if (data.githubUrl) setGithubLink(data.githubUrl);
+        if (data.username) setUsername(data.username);
       }
     } catch (error) {
       console.error('Error fetching user profile:', error);
@@ -164,27 +167,35 @@ const ProfilePage: React.FC = () => {
 
   const saveGithubLink = async () => {
     if (!user) return;
-
     setSaving(true);
     try {
-      const response = await fetch('/api/user/profile', {
+      await fetch('/api/user/profile', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId: user.uid,
-          githubLink: githubLink.trim()
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, githubUrl: githubLink.trim() }),
       });
-
-      if (response.ok) {
-        setEditingGithub(false);
-      }
+      setEditingGithub(false);
     } catch (error) {
       console.error('Error saving GitHub link:', error);
     } finally {
       setSaving(false);
+    }
+  };
+
+  const saveUsername = async () => {
+    if (!user || !username.trim() || username.trim().length < 3) return;
+    setSavingUsername(true);
+    try {
+      await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.uid, username: username.trim() }),
+      });
+      setEditingUsername(false);
+    } catch (error) {
+      console.error('Error saving username:', error);
+    } finally {
+      setSavingUsername(false);
     }
   };
 
@@ -206,20 +217,23 @@ const ProfilePage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-50 backdrop-blur-md bg-white/80">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
+              <img src="/APILogo.png" alt="Logo" className="w-8 h-8 object-contain" />
+              <span className="text-xl font-bold text-gray-900">API Store</span>
+            </div>
             <button
               onClick={() => router.push('/')}
-              className="text-gray-600 hover:text-gray-800 transition-colors"
+              className="text-gray-500 hover:text-gray-700 font-medium text-sm transition-colors"
             >
               ← Back
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">Profile Dashboard</h1>
           </div>
           <button
             onClick={() => router.push('/submit-api')}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition font-semibold"
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition font-bold text-xs uppercase tracking-wider shadow-md shadow-indigo-100"
           >
             Submit API
           </button>
@@ -237,7 +251,44 @@ const ProfilePage: React.FC = () => {
               <h2 className="text-2xl font-bold text-gray-800 mb-2">{user.displayName || 'User'}</h2>
               <p className="text-gray-600 mb-4">{user.email}</p>
 
-              {/* GitHub Link Section */}
+              {/* Username */}
+              <div className="mb-3 flex items-center gap-3">
+                <span className="text-gray-700 font-semibold">Username:</span>
+                {editingUsername ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="e.g. john_dev"
+                      className="px-3 py-1 bg-gray-50 border border-gray-300 rounded text-gray-800 placeholder-gray-500 focus:outline-none focus:border-blue-500"
+                    />
+                    <button
+                      onClick={saveUsername}
+                      disabled={savingUsername}
+                      className="px-3 py-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white rounded text-sm transition"
+                    >
+                      {savingUsername ? 'Saving...' : 'Save'}
+                    </button>
+                    <button
+                      onClick={() => { setEditingUsername(false); fetchUserProfile(user!.uid); }}
+                      className="px-3 py-1 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm transition"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-800 font-medium">@{username || 'not set'}</span>
+                    <button
+                      onClick={() => setEditingUsername(true)}
+                      className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-800 rounded text-sm transition"
+                    >
+                      {username ? 'Edit' : 'Add'}
+                    </button>
+                  </div>
+                )}
+              </div>
               <div className="mb-4">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="text-gray-700 font-semibold">GitHub:</span>
@@ -295,6 +346,12 @@ const ProfilePage: React.FC = () => {
               <div className="flex gap-4 text-sm">
                 <div className="px-3 py-1 bg-gray-100 rounded text-gray-700">
                   {submittedApis.length} API{submittedApis.length !== 1 ? 's' : ''} Submitted
+                </div>
+                <div className="px-3 py-1 bg-green-100 text-green-700 rounded">
+                  {submittedApis.filter(a => (a as any).status === 'approved').length} Approved
+                </div>
+                <div className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded">
+                  {submittedApis.filter(a => (a as any).status === 'pending').length} Pending Review
                 </div>
                 <div className="px-3 py-1 bg-gray-100 rounded text-gray-700">
                   Member since {new Date().getFullYear()}
@@ -356,9 +413,11 @@ const ProfilePage: React.FC = () => {
                   >
                     <div className="flex items-start justify-between mb-3">
                       <h4 className="text-lg font-semibold text-gray-800">{api.API}</h4>
-                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded font-medium">
-                        Owner
-                      </span>
+                      {(api as any).status === 'approved' ? (
+                        <span className="px-2 py-1 bg-green-600 text-white text-xs rounded font-medium">✓ Approved</span>
+                      ) : (
+                        <span className="px-2 py-1 bg-yellow-500 text-white text-xs rounded font-medium">⏳ Pending</span>
+                      )}
                     </div>
                     <p className="text-gray-600 text-sm mb-4 line-clamp-3">{api.Description}</p>
                     <div className="flex items-center justify-between">

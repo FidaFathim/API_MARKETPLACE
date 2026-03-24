@@ -1,7 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as adminLib from 'firebase-admin';
 
-// Mock user profile storage (in a real app, use a database)
-const userProfiles: Record<string, { githubLink?: string }> = {};
+// Initialize Firebase Admin SDK
+if (!adminLib.apps.length) {
+  try {
+    const serviceAccount = require('../../../../serviceAccountKey.json');
+    adminLib.initializeApp({ credential: adminLib.credential.cert(serviceAccount) });
+  } catch (e) {
+    console.error('Firebase Admin init error in /api/user/profile:', e);
+  }
+}
+
+const db = adminLib.firestore();
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -11,33 +21,69 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'User ID required' }, { status: 400 });
   }
 
-  const profile = userProfiles[userId] || {};
-  return NextResponse.json(profile);
+  try {
+    const userDoc = await db.collection('users').doc(userId).get();
+    if (!userDoc.exists) {
+      return NextResponse.json({});
+    }
+    const data = userDoc.data()!;
+    return NextResponse.json({
+      username: data.username || null,
+      email: data.email || null,
+      githubUrl: data.githubUrl || null,
+      linkedinUrl: data.linkedinUrl || null,
+      createdAt: data.createdAt || null,
+    });
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 });
+  }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, githubLink } = await request.json();
+    const body = await request.json();
+    const { userId, username, email, githubUrl, linkedinUrl, isNewUser } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    // Store or update user profile
-    if (!userProfiles[userId]) {
-      userProfiles[userId] = {};
-    }
-    
-    if (githubLink !== undefined) {
-      userProfiles[userId].githubLink = githubLink;
+    const userRef = db.collection('users').doc(userId);
+
+    if (isNewUser) {
+      // For Google sign-ups: only set fields if doc doesn't already exist
+      const existing = await userRef.get();
+      if (!existing.exists) {
+        await userRef.set({
+          username: username || null,
+          email: email || null,
+          credits: 0,
+          purchasedAPIs: [],
+          earnings: 0,
+          createdAt: new Date().toISOString(),
+        });
+      }
+    } else {
+      // For email sign-ups or profile updates: merge fields
+      const updateData: Record<string, any> = {};
+      if (username !== undefined) updateData.username = username;
+      if (email !== undefined) updateData.email = email;
+      if (githubUrl !== undefined) updateData.githubUrl = githubUrl;
+      if (linkedinUrl !== undefined) updateData.linkedinUrl = linkedinUrl;
+
+      await userRef.set({
+        ...updateData,
+        credits: 0,
+        purchasedAPIs: [],
+        earnings: 0,
+        createdAt: new Date().toISOString(),
+      }, { merge: true });
     }
 
-    return NextResponse.json({ 
-      message: 'Profile updated successfully',
-      profile: userProfiles[userId]
-    });
+    return NextResponse.json({ message: 'Profile saved successfully' });
   } catch (error) {
-    console.error('Error updating user profile:', error);
-    return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+    console.error('Error saving user profile:', error);
+    return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 });
   }
 }

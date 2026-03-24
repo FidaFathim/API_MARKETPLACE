@@ -1,91 +1,155 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getFirestore, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
-import { initializeApp, getApps } from 'firebase/app';
+import * as adminLib from 'firebase-admin';
 
-// Initialize Firebase Admin (server-side)
-const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_Firebase_apiKey,
-  authDomain: process.env.NEXT_PUBLIC_Firebase_authDomain,
-  projectId: process.env.NEXT_PUBLIC_Firebase_projectId,
-  storageBucket: process.env.NEXT_PUBLIC_Firebase_storageBucket,
-  messagingSenderId: process.env.NEXT_PUBLIC_Firebase_messagingSenderId,
-  appId: process.env.NEXT_PUBLIC_Firebase_appId,
-};
+// Initialize Firebase Admin SDK (server-side only — bypasses Firestore security rules)
+if (!adminLib.apps.length) {
+  try {
+    const serviceAccount = require('../../../serviceAccountKey.json');
+    adminLib.initializeApp({
+      credential: adminLib.credential.cert(serviceAccount),
+    });
+  } catch (e) {
+    console.error('Firebase Admin init error in /api/submit:', e);
+  }
+}
 
-const app = !getApps().length ? initializeApp(firebaseConfig) : getApps()[0];
-const db = getFirestore(app);
+const db = adminLib.firestore();
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
 
-    // Optional: Get user ID from request (client-side Firebase Auth)
-    const authHeader = req.headers.get('authorization') || '';
-    const token = authHeader.startsWith('Bearer ') ? authHeader.split(' ')[1] : null;
-
-    let uid: string | null = null;
-    if (token && body.userId) {
-      uid = body.userId;
-    } else if (token) {
-      uid = 'anonymous';
-    }
+    // Extract user ID from request
+    const { name, description, link, category, auth: authType, https, cors, isPaid, price, userId } = body;
 
     // Basic validation
-    const { name, description, link, category, auth: authType, https, cors, isPaid, price } = body;
     if (!name || !description || !link) {
-      return NextResponse.json({ success: false, error: 'Missing required fields (name, description, link)' }, { status: 400 });
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields (name, description, link)' },
+        { status: 400 }
+      );
+    }
+
+    // Validate URL format
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(link);
+    } catch {
+      return NextResponse.json(
+        { success: false, error: 'Invalid API link URL' },
+        { status: 400 }
+      );
     }
 
     // Validate pricing
-    if (isPaid && (!price || price < 0.99)) {
-      return NextResponse.json({ success: false, error: 'Paid APIs must have a price of at least $0.99' }, { status: 400 });
+    if (isPaid && (!price || price < 50)) {
+      return NextResponse.json(
+        { success: false, error: 'Paid APIs must have a price of at least ₹50' },
+        { status: 400 }
+      );
     }
 
-    // Check if API already exists (by name or link)
-    const apisRef = collection(db, 'apis');
-    const nameQuery = query(apisRef, where('API', '==', name));
-    const linkQuery = query(apisRef, where('Link', '==', link));
+    // ── Run automated security checks ────────────────────────────────────────
+    // Call the security-check route internally
+    let securityReport: any = null;
+    try {
+      const origin = req.nextUrl.origin;
+      const secRes = await fetch(`${origin}/api/security-check`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: link }),
+      });
+      securityReport = await secRes.json();
+    } catch (secErr) {
+      console.error('Security check error (non-blocking):', secErr);
+      // Don't block submission if security service fails
+    }
 
-    const [nameSnapshot, linkSnapshot] = await Promise.all([
-      getDocs(nameQuery),
-      getDocs(linkQuery)
+    // ── Hard block: block submissions flagged as CRITICAL risk ────────────────
+    if (securityReport && securityReport.riskLevel === 'critical') {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Security scan failed: This URL was flagged as malicious by VirusTotal. Submission blocked.',
+          securityReport,
+        },
+        { status: 422 }
+      );
+    }
+
+    // Check for duplicates across both 'apis' (approved) and 'pending_apis' collections
+    const [
+      approvedByName,
+      approvedByLink,
+      pendingByName,
+      pendingByLink,
+    ] = await Promise.all([
+      db.collection('apis').where('API', '==', name).get(),
+      db.collection('apis').where('Link', '==', link).get(),
+      db.collection('pending_apis').where('API', '==', name).get(),
+      db.collection('pending_apis').where('Link', '==', link).get(),
     ]);
 
-    if (!nameSnapshot.empty || !linkSnapshot.empty) {
-      return NextResponse.json({
-        success: false,
-        error: 'API already exists in the list'
-      }, { status: 409 });
+    if (!approvedByName.empty || !approvedByLink.empty) {
+      return NextResponse.json(
+        { success: false, error: 'An API with this name or link already exists in the marketplace.' },
+        { status: 409 }
+      );
     }
 
-    // Create new API entry
-    const newApiEntry = {
+    if (!pendingByName.empty || !pendingByLink.empty) {
+      return NextResponse.json(
+        { success: false, error: 'An API with this name or link is already pending review.' },
+        { status: 409 }
+      );
+    }
+
+    // Build the new pending API entry, including the full security report
+    const newPendingEntry: Record<string, any> = {
       API: name,
       Description: description,
       Auth: authType || '',
-      HTTPS: https !== undefined ? https : true,
+      HTTPS: parsedUrl.protocol === 'https:',
       Cors: cors || 'unknown',
       Link: link,
       Category: category || 'General',
-      userId: uid,
+      userId: userId || null,
       submittedAt: new Date().toISOString(),
       isPaid: isPaid || false,
       price: isPaid ? price : 0,
-      endpoint: link, // Store endpoint for paid APIs
-      createdAt: new Date().toISOString(),
+      endpoint: link,
+      status: 'pending',
+      // Attach the security scan results
+      securityReport: securityReport || null,
+      securityRiskLevel: securityReport?.riskLevel || 'unknown',
     };
 
-    // Add to Firestore
-    const docRef = await addDoc(apisRef, newApiEntry);
+    // Write to 'pending_apis' collection (separate from main 'apis' collection)
+    const docRef = await db.collection('pending_apis').add(newPendingEntry);
 
-    return NextResponse.json({
-      success: true,
-      message: 'API added successfully to the marketplace',
-      api: { ...newApiEntry, id: docRef.id },
-      totalCount: 'N/A' // We can add a count query if needed
-    }, { status: 201 });
+    // Compose a user-friendly response with security info
+    const riskMessages: Record<string, string> = {
+      low: 'Security scan completed — no significant issues found.',
+      medium: 'Security scan completed — some warnings detected. Awaiting admin review.',
+      high: 'Security scan completed — some issues detected. An admin will review carefully.',
+      unknown: 'Security scan could not be completed. Admin will review manually.',
+    };
+
+    return NextResponse.json(
+      {
+        success: true,
+        message: 'Your API has been submitted for review. Our team will review it shortly.',
+        securityNote: securityReport ? riskMessages[securityReport.riskLevel] : riskMessages.unknown,
+        riskLevel: securityReport?.riskLevel || 'unknown',
+        id: docRef.id,
+      },
+      { status: 201 }
+    );
   } catch (err) {
-    console.error('Submit API error', err);
-    return NextResponse.json({ success: false, error: err instanceof Error ? err.message : 'Unknown error' }, { status: 500 });
+    console.error('Submit API error:', err);
+    return NextResponse.json(
+      { success: false, error: err instanceof Error ? err.message : 'Unknown error' },
+      { status: 500 }
+    );
   }
 }

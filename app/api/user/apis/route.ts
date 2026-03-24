@@ -1,32 +1,46 @@
 import { NextRequest, NextResponse } from 'next/server';
-import fs from 'fs';
-import path from 'path';
+import * as adminLib from 'firebase-admin';
 
-// Path to the APIs JSON file
-const apisFilePath = path.join(process.cwd(), 'data', 'apis.json');
+// Initialize Firebase Admin SDK
+if (!adminLib.apps.length) {
+  try {
+    const serviceAccount = require('../../../../serviceAccountKey.json');
+    adminLib.initializeApp({ credential: adminLib.credential.cert(serviceAccount) });
+  } catch (e) {
+    console.error('Firebase Admin init error in /api/user/apis:', e);
+  }
+}
+
+const db = adminLib.firestore();
 
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const userId = searchParams.get('userId');
+
+  if (!userId) {
+    return NextResponse.json({ error: 'User ID required' }, { status: 400 });
+  }
+
   try {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    // Fetch from both collections: pending_apis and approved apis
+    const [pendingSnap, approvedSnap] = await Promise.all([
+      db.collection('pending_apis').where('userId', '==', userId).get(),
+      db.collection('apis').where('userId', '==', userId).get(),
+    ]);
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 });
-    }
+    const pendingApis = pendingSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      status: 'pending',
+    }));
 
-    // Read the existing APIs
-    let apis = [];
-    const apisFilePath = path.join(process.cwd(), 'data', 'apis.json');
-    if (fs.existsSync(apisFilePath)) {
-      const fileContent = fs.readFileSync(apisFilePath, 'utf8');
-      const data = JSON.parse(fileContent);
-      apis = data.entries || [];
-    }
+    const approvedApis = approvedSnap.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data(),
+      status: 'approved',
+    }));
 
-    // Filter APIs by userId
-    const userApis = apis.filter((api: any) => api.userId === userId);
-
-    return NextResponse.json({ apis: userApis });
+    return NextResponse.json({ apis: [...pendingApis, ...approvedApis] });
   } catch (error) {
     console.error('Error fetching user APIs:', error);
     return NextResponse.json({ error: 'Failed to fetch APIs' }, { status: 500 });

@@ -37,7 +37,11 @@ const SubmitApiPage: React.FC = () => {
   const router = useRouter();
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState<LoadingState>({ authenticating: true, testing: false });
+  const [submitting, setSubmitting] = useState(false);
+  const [scanPhase, setScanPhase] = useState<'idle' | 'scanning' | 'done'>('idle');
+  const [securityResult, setSecurityResult] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<'submission' | 'testing'>('submission');
+  const [submitted, setSubmitted] = useState(false);
 
   const [apiForm, setApiForm] = useState<ApiSubmission>({
     name: '',
@@ -189,16 +193,15 @@ const SubmitApiPage: React.FC = () => {
   };
 
   const handleSubmitApi = async () => {
-    if (!validateApiForm()) {
-      return;
-    }
+    if (!validateApiForm()) return;
 
     setErrorMessage('');
-    try {
-      // Get user ID from Firebase Auth (client-side)
-      const userId = auth.currentUser?.uid;
+    setSecurityResult(null);
+    setSubmitting(true);
+    setScanPhase('scanning');
 
-      // Token is optional now - can be used for future server-side verification
+    try {
+      const userId = auth.currentUser?.uid;
       const token = await auth.currentUser?.getIdToken().catch(() => null);
 
       const payload = {
@@ -209,7 +212,7 @@ const SubmitApiPage: React.FC = () => {
         auth: apiForm.auth,
         https: apiForm.https,
         cors: apiForm.cors,
-        userId: userId || null, // Include user ID in payload
+        userId: userId || null,
         isPaid: apiForm.isPaid,
         price: apiForm.isPaid ? apiForm.price : 0,
       };
@@ -218,38 +221,35 @@ const SubmitApiPage: React.FC = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { Authorization: `Bearer ${token}` }), // Optional token
+          ...(token && { Authorization: `Bearer ${token}` }),
         },
         body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+      setScanPhase('done');
+
       if (!res.ok) {
+        // Show security report even on block (422)
+        if (data?.securityReport) setSecurityResult(data.securityReport);
         setErrorMessage(data?.error || 'Submission failed');
         return;
       }
 
-      setSuccessMessage(
-        data.message || `API "${data.api?.API || apiForm.name}" added successfully to the marketplace! (Total: ${data.totalCount || 'N/A'} APIs)`
-      );
-      setTimeout(() => {
-        setSuccessMessage('');
-        setApiForm({
-          name: '',
-          description: '',
-          link: '',
-          category: 'General',
-          auth: 'none',
-          https: true,
-          cors: 'yes',
-          method: 'GET',
-          isPaid: false,
-          price: 50.00,
-        });
-      }, 3000);
+      if (data?.securityReport) setSecurityResult(data.securityReport);
+
+      setSubmitted(true);
+      setApiForm({
+        name: '', description: '', link: '', category: 'General',
+        auth: 'none', https: true, cors: 'yes', method: 'GET',
+        isPaid: false, price: 50.00,
+      });
     } catch (err) {
+      setScanPhase('idle');
       console.error('Submit error', err);
       setErrorMessage(err instanceof Error ? err.message : 'Failed to submit API');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -276,16 +276,19 @@ const SubmitApiPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-orange-50">
       {/* Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50 shadow-sm">
+      <header className="bg-white border-b border-gray-100 sticky top-0 z-50 backdrop-blur-md bg-white/80">
         <div className="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-2 cursor-pointer" onClick={() => router.push('/')}>
+              <img src="/APILogo.png" alt="Logo" className="w-8 h-8 object-contain" />
+              <span className="text-xl font-bold text-gray-900">API Store</span>
+            </div>
             <button
               onClick={() => router.push('/')}
-              className="text-gray-600 hover:text-gray-800 transition-colors"
+              className="text-gray-500 hover:text-gray-700 font-medium text-sm transition-colors"
             >
               ← Back
             </button>
-            <h1 className="text-2xl font-bold text-gray-800">Submit API</h1>
           </div>
         </div>
       </header>
@@ -464,15 +467,118 @@ const SubmitApiPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmitApi}
-              className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition"
-            >
-              Submit API
-            </button>
+            {/* Scanning Overlay */}
+            {scanPhase === 'scanning' && (
+              <div className="w-full p-8 bg-indigo-50 border border-indigo-200 rounded-lg text-center">
+                <div className="flex items-center justify-center gap-3 mb-4">
+                  <div className="w-8 h-8 border-4 border-indigo-600 border-t-transparent rounded-full animate-spin"></div>
+                  <span className="text-xl font-bold text-indigo-800">Running Security Checks...</span>
+                </div>
+                <div className="space-y-2 text-sm text-indigo-700 text-left max-w-sm mx-auto">
+                  {['🔍 Submitting URL to VirusTotal...', '🔒 Checking HTTPS enforcement...', '🌐 Auditing domain patterns...', '📋 Scanning response headers...', '🔗 Verifying URL reachability...'].map((step, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span>{step}</span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-xs text-indigo-500 mt-4">This may take 20–30 seconds for VirusTotal analysis</p>
+              </div>
+            )}
+
+            {/* Security Report Panel */}
+            {scanPhase === 'done' && securityResult && !submitted && (
+              <div className={`w-full p-5 rounded-lg border mb-4 ${
+                securityResult.riskLevel === 'critical' ? 'bg-red-50 border-red-300' :
+                securityResult.riskLevel === 'high' ? 'bg-orange-50 border-orange-300' :
+                securityResult.riskLevel === 'medium' ? 'bg-yellow-50 border-yellow-300' :
+                'bg-green-50 border-green-300'
+              }`}>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="font-bold text-gray-800 flex items-center gap-2">
+                    🛡️ Security Scan Report
+                  </h4>
+                  <span className={`px-3 py-1 text-xs font-bold rounded-full uppercase ${
+                    securityResult.riskLevel === 'critical' ? 'bg-red-600 text-white' :
+                    securityResult.riskLevel === 'high' ? 'bg-orange-500 text-white' :
+                    securityResult.riskLevel === 'medium' ? 'bg-yellow-500 text-white' :
+                    'bg-green-600 text-white'
+                  }`}>
+                    {securityResult.riskLevel} risk
+                  </span>
+                </div>
+                <div className="space-y-2">
+                  {securityResult.checks?.map((check: any, i: number) => (
+                    <div key={i} className="flex items-start gap-2 text-sm">
+                      <span className={`mt-0.5 flex-shrink-0 ${
+                        check.status === 'pass' ? 'text-green-600' :
+                        check.status === 'fail' ? 'text-red-600' :
+                        check.status === 'warn' ? 'text-yellow-600' : 'text-gray-400'
+                      }`}>
+                        {check.status === 'pass' ? '✅' : check.status === 'fail' ? '❌' : check.status === 'warn' ? '⚠️' : '⏭️'}
+                      </span>
+                      <div>
+                        <span className="font-medium text-gray-700">{check.name}: </span>
+                        <span className="text-gray-600">{check.detail}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                {securityResult.virusTotalStats?.permalink && (
+                  <a
+                    href={securityResult.virusTotalStats.permalink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block mt-3 text-xs text-indigo-600 hover:underline"
+                  >
+                    View full VirusTotal report ↗
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Submit Button / Success Card */}
+            {scanPhase !== 'scanning' && (
+              submitted ? (
+                <div className="w-full p-6 bg-blue-50 border border-blue-200 rounded-lg text-center">
+                  <div className="text-4xl mb-3">✅</div>
+                  <h3 className="text-xl font-bold text-blue-800 mb-2">API Submitted for Review!</h3>
+                  <p className="text-blue-700">
+                    Your API has been submitted and is pending admin approval.
+                    You will be notified once it goes live on the marketplace.
+                  </p>
+                  {securityResult && (
+                    <p className={`mt-2 text-sm font-medium ${
+                      securityResult.riskLevel === 'low' ? 'text-green-600' : 'text-yellow-700'
+                    }`}>
+                      Security scan: {securityResult.riskLevel?.toUpperCase()} risk
+                    </p>
+                  )}
+                  <button
+                    onClick={() => { setSubmitted(false); setScanPhase('idle'); setSecurityResult(null); }}
+                    className="mt-4 px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition"
+                  >
+                    Submit Another API
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleSubmitApi}
+                  disabled={submitting}
+                  className="w-full px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-bold rounded-lg transition flex items-center justify-center gap-2"
+                >
+                  {submitting ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      Running Security Checks...
+                    </>
+                  ) : '🔍 Submit API for Review'}
+                </button>
+              )
+            )}
           </div>
         )}
+
 
         {/* Testing Tab */}
         {activeTab === 'testing' && (
