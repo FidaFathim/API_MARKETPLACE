@@ -4,8 +4,19 @@ import * as adminLib from 'firebase-admin';
 // Initialize Firebase Admin SDK
 if (!adminLib.apps.length) {
   try {
-    const serviceAccount = require('../../../../serviceAccountKey.json');
-    adminLib.initializeApp({ credential: adminLib.credential.cert(serviceAccount) });
+    let credential;
+    if (process.env.FIREBASE_PRIVATE_KEY) {
+      credential = adminLib.credential.cert({
+        projectId: process.env.FIREBASE_PROJECT_ID,
+        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      });
+    } else {
+      credential = adminLib.credential.cert(
+        JSON.parse(require('fs').readFileSync(process.cwd() + '/serviceAccountKey.json', 'utf8'))
+      );
+    }
+    adminLib.initializeApp({ credential });
   } catch (e) {
     console.error('Firebase Admin init error in /api/user/apis:', e);
   }
