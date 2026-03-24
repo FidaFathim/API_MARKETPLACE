@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { loadStripe } from '@stripe/stripe-js';
 import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js';
@@ -81,7 +81,7 @@ function CheckoutForm({ apiData }: { apiData: ApiData }) {
     );
 }
 
-export default function CheckoutPage() {
+function CheckoutPageInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const apiId = searchParams.get('apiId');
@@ -234,3 +234,12 @@ export default function CheckoutPage() {
         </div>
     );
 }
+
+export default function CheckoutPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
+            <CheckoutPageInner />
+        </Suspense>
+    );
+}
+

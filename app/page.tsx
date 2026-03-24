@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/app/firebase/config';
@@ -1283,7 +1283,7 @@ function ApiDetailsPage({ apiId, onBackToHome }: { apiId: string; onBackToHome: 
   );
 }
 
-export default function Page() {
+function PageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const apiId = searchParams.get('apiId');
@@ -1322,5 +1322,13 @@ export default function Page() {
       <LandingPage onApiSelect={handleApiSelect} />
       <Chatbot />
     </>
+  );
+}
+
+export default function Page() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-white"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
+      <PageInner />
+    </Suspense>
   );
 }

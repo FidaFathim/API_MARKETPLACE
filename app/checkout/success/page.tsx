@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/app/firebase/config';
 import { getFirestore, doc, getDoc, updateDoc, arrayUnion, increment, addDoc, collection } from 'firebase/firestore';
 
-export default function SuccessPage() {
+function SuccessPageInner() {
     const router = useRouter();
     const searchParams = useSearchParams();
     const paymentIntent = searchParams.get('payment_intent');
@@ -213,3 +213,12 @@ export default function SuccessPage() {
         </div>
     );
 }
+
+export default function SuccessPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div></div>}>
+            <SuccessPageInner />
+        </Suspense>
+    );
+}
+
