@@ -4,7 +4,6 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '@/app/firebase/config';
-import { getFirestore, doc, getDoc, updateDoc, arrayUnion, arrayRemove, increment, addDoc, collection } from 'firebase/firestore';
 
 function SuccessPageInner() {
     const router = useRouter();
@@ -36,61 +35,32 @@ function SuccessPageInner() {
         const processPayment = async () => {
             try {
                 setLoading(true);
-                const db = getFirestore();
 
-                // Note: In production, verify payment server-side
-                // For now, we'll trust the payment_intent parameter
+                // Call server-side API to process the payment (Admin SDK bypasses security rules)
+                const response = await fetch('/api/process-payment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        userId: user.uid,
+                        userEmail: user.email,
+                        apiId: apiId,
+                        paymentIntentId: paymentIntent,
+                    }),
+                });
 
-                // Get API data
-                const apiDoc = await getDoc(doc(db, 'apis', apiId));
-                if (!apiDoc.exists()) {
-                    setError('API not found');
+                const data = await response.json();
+
+                if (!response.ok) {
+                    setError(data.error || 'Failed to process payment');
                     return;
                 }
 
-                const api = { id: apiDoc.id, ...apiDoc.data() } as any;
-                setApiData(api);
-
-                // Check if user already purchased this API
-                const userDoc = await getDoc(doc(db, 'users', user.uid));
-                const userData = userDoc.data();
-
-                if (userData?.purchasedAPIs?.includes(apiId)) {
-                    setSuccess(true);
-                    setLoading(false);
-                    return;
-                }
-
-                // Update buyer's purchasedAPIs and remove from cart
-                await updateDoc(doc(db, 'users', user.uid), {
-                    purchasedAPIs: arrayUnion(apiId),
-                    cart: arrayRemove(apiId),
+                setApiData({
+                    API: data.apiName,
+                    Description: data.apiDescription,
+                    endpoint: data.apiEndpoint,
+                    price: data.apiPrice,
                 });
-
-                // Update seller's earnings (if seller exists)
-                if (api.userId) {
-                    const sellerDocRef = doc(db, 'users', api.userId);
-                    const sellerDoc = await getDoc(sellerDocRef);
-
-                    if (sellerDoc.exists()) {
-                        await updateDoc(sellerDocRef, {
-                            earnings: increment(api.price),
-                        });
-                    }
-                }
-
-                // Record transaction
-                await addDoc(collection(db, 'transactions'), {
-                    buyerId: user.uid,
-                    buyerEmail: user.email,
-                    sellerId: api.userId || null,
-                    apiId: apiId,
-                    apiName: api.API,
-                    amount: api.price,
-                    paymentIntentId: paymentIntent,
-                    createdAt: new Date().toISOString(),
-                });
-
                 setSuccess(true);
             } catch (err) {
                 console.error('Payment processing error:', err);
@@ -169,7 +139,7 @@ function SuccessPageInner() {
                         </div>
                         <div className="bg-white rounded border border-green-300 p-4">
                             <p className="text-sm text-gray-600 mb-2">API Endpoint:</p>
-                            <code className="text-blue-600 font-mono break-all">{apiData.endpoint || apiData.Link}</code>
+                            <code className="text-blue-600 font-mono break-all">{apiData.endpoint}</code>
                         </div>
                     </div>
 
@@ -181,7 +151,7 @@ function SuccessPageInner() {
                             </div>
                             <div>
                                 <p className="text-sm text-gray-600">Amount Paid</p>
-                                <p className="font-semibold text-gray-800">₹{(apiData.price).toFixed(2)}</p>
+                                <p className="font-semibold text-gray-800">₹{(apiData.price || 0).toFixed(2)}</p>
                             </div>
                             <div className="col-span-2">
                                 <p className="text-sm text-gray-600">Description</p>
@@ -197,10 +167,10 @@ function SuccessPageInner() {
                                 Browse More APIs
                             </button>
                             <button
-                                onClick={() => router.push('/dashboard')}
+                                onClick={() => router.push('/profile')}
                                 className="flex-1 px-6 py-3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold rounded-lg transition"
                             >
-                                View Dashboard
+                                View Orders
                             </button>
                         </div>
                     </div>
@@ -208,7 +178,7 @@ function SuccessPageInner() {
 
                 <div className="mt-6 text-center text-sm text-gray-600">
                     <p>Transaction ID: {paymentIntent}</p>
-                    <p className="mt-2">You can view this API in your dashboard at any time.</p>
+                    <p className="mt-2">You can view this API in your profile dashboard at any time.</p>
                 </div>
             </div>
         </div>
@@ -222,4 +192,3 @@ export default function SuccessPage() {
         </Suspense>
     );
 }
-

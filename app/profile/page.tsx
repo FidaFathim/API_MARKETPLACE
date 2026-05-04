@@ -13,7 +13,6 @@ import {
   query,
   where,
   getDocs,
-  orderBy,
 } from 'firebase/firestore';
 
 interface ApiEntry {
@@ -136,11 +135,12 @@ const ProfilePage: React.FC = () => {
       const db = getFirestore(app);
       const q = query(
         collection(db, 'transactions'),
-        where('buyerId', '==', userId),
-        orderBy('createdAt', 'desc')
+        where('buyerId', '==', userId)
       );
       const snapshot = await getDocs(q);
-      const txns = snapshot.docs.map((d) => ({ id: d.id, ...d.data() } as OrderEntry));
+      const txns = snapshot.docs
+        .map((d) => ({ id: d.id, ...d.data() } as OrderEntry))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(txns);
     } catch (err) {
       console.error('Error fetching orders:', err);
